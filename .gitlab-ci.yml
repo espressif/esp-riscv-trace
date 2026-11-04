@@ -1,0 +1,48 @@
+stages:
+  - pre-check
+  - codecheck
+
+# WORKFLOW RULES
+# ------------------------------------------------------------------------------------------------------
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+# ------------------------------------------------------------------------------------------------------
+
+
+# TEMPLATES
+# ------------------------------------------------------------------------------------------------------
+.base_template:
+  image: python:3.11-slim-bookworm
+  tags:
+    - build
+    - internet
+# ------------------------------------------------------------------------------------------------------
+
+
+# JOBS
+# ------------------------------------------------------------------------------------------------------
+include:
+  - project: espressif/shared-ci-dangerjs
+    ref: master
+    file: danger.yaml
+run-danger-mr-linter:
+  stage: pre-check
+  variables:
+    ENABLE_CHECK_UPDATED_CHANGELOG: 'false'
+    # when changing please also update .pre-commit-config.yaml
+    COMMIT_MESSAGE_ALLOWED_TYPES: 'change,ci,docs,feat,fix,refactor,remove,revert,test,perf'
+
+run_pre_commit_hooks:
+  extends: .base_template
+  stage: codecheck
+  before_script:
+    - apt-get update && apt-get install -y -q git
+    - pip install --upgrade pip
+    - pip install pre-commit
+  script:
+    - pre-commit run --all-files
+# ------------------------------------------------------------------------------------------------------
