@@ -3,7 +3,8 @@
 """esp-riscv-trace top-level package.
 
 Decodes RISC-V hardware instruction trace captured on Espressif chips.
-``open_capture`` is the entry point for Python callers.
+``open_capture`` is the entry point for Python callers. ``parse_note`` and ``format_note`` read and describe the
+trace note of a core dump alone.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from .analysis.history import (
 from .analysis.location import CodeLocation
 from .api import TraceCapture, TraceCore, open_capture
 from .decoder.reconstruct import GapReason
+from .exporters.note import format_note
 from .ir.capture_note import ElfShaStatus, TraceCaptureNote
 from .ir.events import (
     InsnClass,
@@ -37,8 +39,27 @@ from .ir.events import (
     TraceTrap,
     TraceWarning,
 )
+from .snapshot.abi import (
+    NOTE_NAME,
+    NOTE_TYPE,
+    AbiError,
+    AddressMode,
+    CaptureReason,
+    MemoryMode,
+    NoteHeader,
+    NoteRecord,
+    PacketFormat,
+    ResyncMode,
+    State,
+    parse_note,
+)
 
 __all__ = [
+    "NOTE_NAME",
+    "NOTE_TYPE",
+    "AbiError",
+    "AddressMode",
+    "CaptureReason",
     "CodeLocation",
     "CodeLoop",
     "ElfShaStatus",
@@ -50,7 +71,13 @@ __all__ = [
     "HistoryLoop",
     "InsnClass",
     "LinkKind",
+    "MemoryMode",
+    "NoteHeader",
+    "NoteRecord",
+    "PacketFormat",
+    "ResyncMode",
     "StackFrame",
+    "State",
     "TraceBoundary",
     "TraceCapture",
     "TraceCaptureNote",
@@ -64,6 +91,8 @@ __all__ = [
     "__version__",
     "build_history",
     "cause_name",
+    "format_note",
     "is_fault",
     "open_capture",
+    "parse_note",
 ]

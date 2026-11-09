@@ -4,6 +4,6 @@
 
 from __future__ import annotations
 
-from . import stats_text, text
+from . import note, stats_text, text
 
-__all__ = ["stats_text", "text"]
+__all__ = ["note", "stats_text", "text"]
