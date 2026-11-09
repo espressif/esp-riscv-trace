@@ -23,6 +23,8 @@ C5_STOP = TESTS / "esp32c5" / "stop.esptrace"
 C5_ELF = APPS / "esp32c5.elf"
 
 BASE = 0x40800000
+NOP = bytes.fromhex("13000000")
+JALR_X0_RA = bytes.fromhex("67800000")
 
 
 class FakeImage:
@@ -74,6 +76,21 @@ def pack_bits(*fields: tuple[int, int]) -> bytes:
         value |= field << position
         position += width
     return value.to_bytes((position + 7) // 8, "little")
+
+
+def encode_jal(rd: int, imm: int) -> bytes:
+    """Encode a 32-bit JAL with a signed byte offset."""
+    assert imm % 2 == 0
+    u = imm & 0x1FFFFF
+    inst = (
+        (((u >> 20) & 1) << 31)
+        | (((u >> 1) & 0x3FF) << 21)
+        | (((u >> 11) & 1) << 20)
+        | (((u >> 12) & 0xFF) << 12)
+        | (rd << 7)
+        | 0x6F
+    )
+    return inst.to_bytes(4, "little")
 
 
 def make_buffer(
