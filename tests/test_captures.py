@@ -35,6 +35,8 @@ CASES: list[tuple[str, str, str, str, list[str], str]] = (
     + [
         ("decode", "esp32s31", "stop.esptrace", "esp32s31.elf", ["--core", "1"], "_core1"),
         ("decode", "esp32c5", "coredump.elf", "esp32c5.elf", ["--last", "20"], "_last"),
+        ("stats", "esp32s31", "stop.esptrace", "esp32s31.elf", [], ""),
+        ("stats", "esp32s31", "stop.esptrace", "esp32s31.elf", ["--merge-cores"], "_merged"),
         ("history", "esp32s31", "coredump.elf", "esp32s31.elf", ["--last", "8", "--json"], "_json"),
     ]
     + [("history", *capture, [], "") for capture in CAPTURES if capture[1] == "coredump.elf"]

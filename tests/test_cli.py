@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
-"""Exit codes, flags and output placement of the decode subcommand.
+"""Exit codes, flags and output placement of the decode and stats subcommands.
 
 Most checks run ``cli.main`` in process on the ESP32-C5 loop capture. The exact output of every capture is checked
 in test_captures.py.
@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import io
 import re
+from collections import Counter
 from unittest import mock
 
 import pytest
@@ -18,12 +19,18 @@ from helpers import (
     C5_ELF,
     C5_STOP,
     S31_ELF,
+    S31_STOP,
+    columns,
+    make_note,
+    make_snapshot,
     run_cli,
     run_main,
 )
 
 import esp_riscv_trace
 from esp_riscv_trace import cli, session
+from esp_riscv_trace.analysis.diagnostics import TraceDiagnostic
+from esp_riscv_trace.analysis.stats import StatsSnapshot
 from esp_riscv_trace.exporters import text as text_exporter
 from esp_riscv_trace.ir.events import InsnClass, Provenance, TraceInstruction, TraceSync
 from esp_riscv_trace.snapshot import abi
@@ -32,12 +39,16 @@ from esp_riscv_trace.snapshot import abi
 _ESPT_ABI_MINOR_OFFSET = 33
 _ESPT_END_STATUS_OFFSET = -4
 
-_COMMANDS = ["decode"]
+_COMMANDS = ["decode", "stats"]
 
 
 def _run(cmd: str, *extra, expect=None):
     """Run ``cmd`` on the ESP32-C5 loop capture with its app ELF."""
     return run_main(cmd, C5_STOP, "--elf", C5_ELF, *extra, expect=expect)
+
+
+def _stats_line(stdout: str) -> str:
+    return next(ln for ln in stdout.splitlines() if ln.startswith("# stats"))
 
 
 def _event_lines(stdout: str) -> list[str]:
@@ -49,7 +60,12 @@ def test_module_entry_point_runs_decode() -> None:
     assert "# esp-riscv-trace decode" in p.stdout
 
 
-@pytest.mark.parametrize("args", [["-h"], ["--help"], ["decode", "-h"]])
+def test_module_entry_point_exits_usage_on_bad_argument() -> None:
+    p = run_cli("stats", C5_STOP, "--elf", C5_ELF, "--top", "-1", expect=cli.EXIT_USAGE)
+    assert "--top" in p.stderr
+
+
+@pytest.mark.parametrize("args", [["-h"], ["--help"], ["decode", "-h"], ["stats", "--help"]])
 def test_help_exits_ok(args: list[str]) -> None:
     p = run_main(*args, expect=cli.EXIT_OK)
     assert "esp-riscv-trace" in p.stdout
@@ -75,6 +91,7 @@ def test_command_help_lists_shared_options(cmd: str) -> None:
         ["bogus"],
         ["decode"],
         ["decode", C5_STOP, "--bogus"],
+        ["stats", C5_STOP, "--elf", C5_ELF, "--top", "hello"],
         ["decode", C5_STOP, "--core", "x"],
     ],
 )
@@ -107,6 +124,16 @@ def test_version() -> None:
 @pytest.mark.parametrize("cmd", _COMMANDS)
 def test_command_ok(cmd: str) -> None:
     _run(cmd, expect=cli.EXIT_OK)
+
+
+def test_stats_missing_elf_is_usage() -> None:
+    p = run_main("stats", C5_STOP, expect=cli.EXIT_USAGE)
+    assert "--elf is required" in p.stderr
+
+
+def test_stats_missing_capture_is_usage() -> None:
+    p = run_main("stats", "/nonexistent.bin", "--elf", C5_ELF, expect=cli.EXIT_USAGE)
+    assert "not found" in p.stderr
 
 
 def test_decode_missing_elf_still_runs() -> None:
@@ -163,13 +190,40 @@ def test_capture_directory_is_usage() -> None:
     assert "Traceback" not in p.stderr
 
 
+def test_negative_top_rejected_by_parser() -> None:
+    p = _run("stats", "--top", "-1", expect=cli.EXIT_USAGE)
+    assert "--top" in p.stderr
+
+
+def test_zero_top_accepted() -> None:
+    p = _run("stats", "--top", "0", "--quiet", expect=cli.EXIT_OK)
+    assert "# stats" in p.stdout
+
+
+def test_decode_and_stats_print_the_same_summary() -> None:
+    decode = _run("decode").stderr.splitlines()[-1]
+    stats = _run("stats").stderr.splitlines()[-1]
+    assert decode == stats
+    assert re.search(r"instructions=\d+ syncs=\d+ traps=\d+ gaps=\d+", decode)
+
+
 @pytest.mark.parametrize("cmd", _COMMANDS)
 def test_quiet_suppresses_summary(cmd: str) -> None:
     p = _run(cmd, "--quiet")
     assert "instructions=" not in p.stderr
 
 
-@pytest.mark.parametrize("cmd,table", [("decode", "# summary")])
+def test_stats_prints_capture_header_before_table() -> None:
+    p = _run("stats")
+    assert p.stdout.index("# esp-riscv-trace stats") < p.stdout.index("# stats")
+
+
+def test_stats_prints_sha_match() -> None:
+    p = _run("stats")
+    assert "# app_elf_sha256    match" in p.stdout
+
+
+@pytest.mark.parametrize("cmd,table", [("decode", "# summary"), ("stats", "# stats")])
 def test_debug_sits_between_header_and_body(cmd: str, table: str) -> None:
     p = _run(cmd, "--debug")
     idx_header = p.stdout.index(f"# esp-riscv-trace {cmd}")
@@ -224,11 +278,45 @@ def test_decode_omits_debug_output_by_default() -> None:
     assert lines[0].startswith(("0x", "---"))
 
 
+def test_stats_omits_raw_dump_by_default() -> None:
+    assert "# raw_buffer" not in _run("stats").stdout
+
+
 @pytest.mark.parametrize("cmd", _COMMANDS)
 def test_summary_footer_per_core(cmd: str) -> None:
     p = _run(cmd)
     assert "# summary           instructions=" in p.stdout
     assert "top_gap_reasons=" in p.stdout
+
+
+def test_merge_cores_renders_diagnostic_per_source_core() -> None:
+    p = _run("stats", "--merge-cores")
+    assert "# core-diagnostic   core=0" in p.stdout
+    assert "# summary           instructions=" in p.stdout
+
+
+def test_stats_top_row_is_the_workload_loop() -> None:
+    p = _run("stats")
+    rows = [ln for ln in p.stdout.splitlines() if ln.startswith("  ")]
+    assert rows, f"no data rows found in:\n{p.stdout}"
+    assert columns(rows[0])[2].text == "branchy_work()"
+
+
+def test_stats_per_block_lists_the_workload_loop() -> None:
+    p = _run("stats", "--per-block", "--top", "1")
+    assert "# branchy_work()" in p.stdout
+    assert "distinct_entry_pcs=" in p.stdout
+
+
+def test_stats_merge_cores_label_uses_cores_prefix() -> None:
+    p = run_main("stats", S31_STOP, "--elf", S31_ELF, "--merge-cores", "--quiet", expect=cli.EXIT_OK)
+    assert "cores=0,1" in [c.text for c in columns(_stats_line(p.stdout))]
+
+
+def test_stats_per_core_label_uses_core_prefix() -> None:
+    line = _stats_line(_run("stats").stdout)
+    assert "core=0" in line
+    assert "cores=" not in line
 
 
 @pytest.mark.parametrize("cmd", _COMMANDS)
@@ -263,6 +351,115 @@ def test_open_session_require_elf_true_raises_when_elf_missing() -> None:
 def test_decode_from_tmp_cwd_succeeds(tmp_path) -> None:
     p = run_cli("decode", C5_STOP, "--elf", C5_ELF, "--quiet", cwd=tmp_path, expect=cli.EXIT_OK)
     assert "# esp-riscv-trace decode" in p.stdout
+
+
+def test_stats_from_tmp_cwd_shows_elf_source_paths(tmp_path) -> None:
+    p = run_cli("stats", C5_STOP, "--elf", C5_ELF, "--quiet", cwd=tmp_path, expect=cli.EXIT_OK)
+    assert re.search(r"(?:^|\s)/IDF_PROJECT/main/test_app_main\.c:\d+", p.stdout)
+
+
+def test_merge_sums_sample_hits() -> None:
+    a = make_snapshot(sample_hits={("f", "/x.c", 1): 3, ("g", "/y.c", 2): 1})
+    b = make_snapshot(sample_hits={("f", "/x.c", 1): 5})
+    merged = StatsSnapshot.merge([a, b])
+    assert merged.sample_hits[("f", "/x.c", 1)] == 8
+    assert merged.sample_hits[("g", "/y.c", 2)] == 1
+
+
+def test_merge_sums_block_hits() -> None:
+    a = make_snapshot(block_hits={("f", 0x1000): 2})
+    b = make_snapshot(block_hits={("f", 0x1000): 5, ("g", 0x2000): 1})
+    merged = StatsSnapshot.merge([a, b])
+    assert merged.block_hits[("f", 0x1000)] == 7
+    assert merged.block_hits[("g", 0x2000)] == 1
+
+
+def test_merge_sums_unresolved_pcs() -> None:
+    a = make_snapshot(unresolved_pcs={"function": 3, "line": 4})
+    b = make_snapshot(unresolved_pcs={"function": 1})
+    merged = StatsSnapshot.merge([a, b])
+    assert merged.unresolved_pcs["function"] == 4
+    assert merged.unresolved_pcs["line"] == 4
+
+
+def test_merge_sums_total_instructions() -> None:
+    a = make_snapshot(sample_hits={("f", "/x.c", 1): 10}, total_instructions=10)
+    b = make_snapshot(sample_hits={("f", "/x.c", 1): 7}, total_instructions=7)
+    assert StatsSnapshot.merge([a, b]).total_instructions == 17
+
+
+def test_merge_empty_iterable_produces_zero_snapshot() -> None:
+    merged = StatsSnapshot.merge([])
+    assert merged.total_instructions == 0
+    assert len(merged.sample_hits) == 0
+    assert len(merged.block_hits) == 0
+
+
+def test_merge_preserves_counter_type() -> None:
+    merged = StatsSnapshot.merge([make_snapshot(sample_hits={("f", "/x.c", 1): 1})])
+    assert isinstance(merged.sample_hits, Counter)
+    assert isinstance(merged.block_hits, Counter)
+    assert isinstance(merged.unresolved_pcs, Counter)
+
+
+class _FakeCore:
+    def __init__(self, core_id: int) -> None:
+        self.core_id = core_id
+
+
+class _FakeView:
+    def __init__(self, core_id: int) -> None:
+        self.core = _FakeCore(core_id)
+        self.note = make_note(
+            source=f"fake-core-{core_id}",
+            core_id=core_id,
+            owner="openocd",
+            wrap_state="not_wrapped",
+            capacity=512,
+            head_offset=142,
+            capture_reason="explicit_stop",
+        )
+
+
+def _diag(total: int) -> TraceDiagnostic:
+    return TraceDiagnostic(instructions=total, syncs=0, traps=0, gaps=0, gap_reasons=Counter(), top_gap_reasons=())
+
+
+def _render_two_cores(merge_cores: bool) -> str:
+    views = [_FakeView(0), _FakeView(1)]
+    triples = [
+        (views[0], make_snapshot(sample_hits={("f", "/x.c", 1): 3}), _diag(3)),
+        (views[1], make_snapshot(sample_hits={("f", "/x.c", 1): 2, ("g", "/y.c", 1): 5}), _diag(7)),
+    ]
+    buf = io.StringIO()
+    cli._render_stats(buf, triples, top=5, per_block=False, merge_cores=merge_cores, debug=False)  # type: ignore[arg-type]
+    return buf.getvalue()
+
+
+def test_merge_cores_label_lists_every_core() -> None:
+    assert "cores=0,1" in _stats_line(_render_two_cores(merge_cores=True))
+
+
+def test_merge_cores_uses_summed_counts_and_denominator() -> None:
+    out = _render_two_cores(merge_cores=True)
+    assert "denominator=10" in out
+    rows = {c[2].text: c for c in (columns(ln) for ln in out.splitlines() if ln.startswith("  "))}
+    assert [c.text for c in rows["f()"][:2]] == ["50.00", "5"]
+    assert [c.text for c in rows["g()"][:2]] == ["50.00", "5"]
+
+
+def test_merge_cores_writes_one_diagnostic_footer_per_source_core() -> None:
+    out = _render_two_cores(merge_cores=True)
+    assert out.count("# core-diagnostic   core=0") == 1
+    assert out.count("# core-diagnostic   core=1") == 1
+    assert out.count("# summary           instructions=") == 2
+
+
+def test_per_core_mode_writes_two_stats_tables() -> None:
+    out = _render_two_cores(merge_cores=False)
+    assert out.count("# stats") == 2
+    assert "core=0" in out
+    assert "core=1" in out
 
 
 @pytest.mark.parametrize("cmd", _COMMANDS)

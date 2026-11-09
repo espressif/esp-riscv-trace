@@ -9,13 +9,16 @@ import dataclasses
 import functools
 import io
 import os
+import re
 import struct
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from unittest import mock
 
 from esp_riscv_trace import cli
+from esp_riscv_trace.analysis.stats import StatsSnapshot
 from esp_riscv_trace.containers.base import TraceBuffer
 from esp_riscv_trace.decoder.framing import Frame
 from esp_riscv_trace.decoder.packets import SyncPacket
@@ -30,6 +33,7 @@ APPS = TESTS / "built_apps"
 
 C5_STOP = TESTS / "esp32c5" / "stop.esptrace"
 C5_ELF = APPS / "esp32c5.elf"
+S31_STOP = TESTS / "esp32s31" / "stop.esptrace"
 S31_ELF = APPS / "esp32s31.elf"
 
 BASE = 0x40800000
@@ -240,6 +244,40 @@ _NOTE_DEFAULTS = dict(
 def make_note(**overrides) -> TraceCaptureNote:
     """ESP32-C5 capture note with ``overrides`` applied."""
     return TraceCaptureNote(**{**_NOTE_DEFAULTS, **overrides})
+
+
+def make_snapshot(
+    *,
+    sample_hits=None,
+    block_hits=None,
+    unresolved_pcs=None,
+    total_instructions: int | None = None,
+) -> StatsSnapshot:
+    """Stats snapshot whose total defaults to the sum of ``sample_hits``."""
+    sample = Counter(sample_hits or {})
+    if total_instructions is None:
+        total_instructions = sum(sample.values())
+    return StatsSnapshot(
+        sample_hits=sample,
+        block_hits=Counter(block_hits or {}),
+        unresolved_pcs=Counter(unresolved_pcs or {}),
+        total_instructions=total_instructions,
+    )
+
+
+_COLUMN = re.compile(r"\S+(?: \S+)*")
+
+
+@dataclasses.dataclass(frozen=True)
+class Column:
+    start: int
+    end: int
+    text: str
+
+
+def columns(line: str) -> list[Column]:
+    """Split a table line at runs of two or more spaces, without the leading comment mark."""
+    return [Column(m.start(), m.end(), m.group()) for m in _COLUMN.finditer(line) if m.group() != "#"]
 
 
 @dataclasses.dataclass(frozen=True)

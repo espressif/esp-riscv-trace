@@ -24,9 +24,18 @@ from .history import (
     iter_entries,
 )
 from .location import CodeLocation, locate
+from .stats import (
+    UNRESOLVED_FILE,
+    UNRESOLVED_LINE,
+    StatsAccumulator,
+    StatsSnapshot,
+    unresolved_function_label,
+)
 
 __all__ = [
     "DIAG_ROOT_NO_PCS_RECOVERED",
+    "UNRESOLVED_FILE",
+    "UNRESOLVED_LINE",
     "CodeLocation",
     "CodeLoop",
     "DiagnosticAccumulator",
@@ -37,10 +46,13 @@ __all__ = [
     "HistoryKind",
     "HistoryLoop",
     "StackFrame",
+    "StatsAccumulator",
+    "StatsSnapshot",
     "TraceDiagnostic",
     "build_history",
     "cause_name",
     "is_fault",
     "iter_entries",
     "locate",
+    "unresolved_function_label",
 ]

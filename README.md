@@ -3,8 +3,8 @@
 Decoder for RISC-V hardware instruction trace captured on Espressif chips.
 
 It reads OpenOCD `.esptrace` captures and `esp-coredump` core ELFs with a trace note. It reconstructs the executed
-program flow, resolves each PC to a function and source line through the app ELF, and writes a text dump or the call
-history that led to a crash. Lost instruction continuity is reported as a gap.
+program flow, resolves each PC to a function and source line through the app ELF, and writes a text dump, a hot-spot
+table or the call history that led to a crash. Lost instruction continuity is reported as a gap.
 
 It is a command-line tool. Other tools, such as `esp-coredump`, read captures through the
 [Python API](#python-api). The other modules are internal and have no stable API.
@@ -60,6 +60,8 @@ Pass the core dump ELF (for example from `esp-coredump info_corefile -s coredump
 ```bash
 esp-riscv-trace decode trace.esptrace --elf build/app.elf             # text dump of the executed instructions
 esp-riscv-trace decode coredump.elf --elf build/app.elf --core 1      # trace from a core dump, one core
+esp-riscv-trace stats trace.esptrace --elf build/app.elf --top 20     # hottest source lines
+esp-riscv-trace stats trace.esptrace --elf build/app.elf --merge-cores --per-block
 esp-riscv-trace history coredump.elf --elf build/app.elf              # calls and returns that led to the crash
 esp-riscv-trace decode coredump.elf --elf build/app.elf --last 50     # last 50 instructions before the crash
 ```
@@ -71,6 +73,7 @@ ESP-IDF environment.
 
 ```
 esp-riscv-trace decode  <capture> [options]
+esp-riscv-trace stats   <capture> --elf PATH [options]
 esp-riscv-trace history <capture> --elf PATH [options]
 ```
 
@@ -81,7 +84,7 @@ Options for every command:
 
 | Option | Meaning |
 | --- | --- |
-| `--elf PATH` | Application ELF for function names and source lines. Required by `history` |
+| `--elf PATH` | Application ELF for function names and source lines. Required by `stats` and `history` |
 | `--rom-elf PATH` | ROM ELF for ROM addresses (requires `--elf`). Without it, the ESP-IDF environment is searched |
 | `--core N` | Process only this core |
 | `--chip NAME` | Override the chip recorded in the capture. One of the [supported chips](#supported-chips), written like `esp32c5` |
@@ -96,6 +99,15 @@ Options for every command:
 | `--debug` | Hex-dump each core's raw encoder buffer after its header, and prefix each event line with its packet payload |
 
 A fault is an exception other than `ecall`. With `--last`, the summary still covers the whole trace.
+
+`stats` adds:
+
+| Option | Meaning |
+| --- | --- |
+| `--top N` | Number of rows in the table (default 20) |
+| `--per-block` | Add per-function block entry tables |
+| `--merge-cores` | Combine all cores into one table |
+| `--debug` | Hex-dump each core's raw encoder buffer after its header |
 
 `history` adds:
 
@@ -179,9 +191,16 @@ returns from them, `<~ switch to f` (a trap return into other code than the inte
 and `-- gap reason`. A return that does not match its call is marked `!!`. Depths compare only between a gap or
 context switch and the next one.
 
-All commands share one pipeline: `containers` loads the per-core buffers, `decoder` orders, frames and parses the
-packets and follows the control flow through the ELF, `analysis` builds the history, and `exporters`
-write the result.
+`stats` prints the same `#` header, then one table per core. The table of
+`esp-riscv-trace stats tests/esp32c5/stop.esptrace --elf tests/built_apps/esp32c5.elf --top 3`:
+
+```text
+# stats             core=0  instructions=48431  denominator=48431  top=3
+#    pct  count  function                          file:line
+   49.98  24206  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:31
+   24.97  12092  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:32
+   18.73   9069  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:35
+```
 
 ## Python API
 

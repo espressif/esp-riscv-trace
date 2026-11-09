@@ -1,0 +1,59 @@
+# esp-riscv-trace stats
+# source            tests/esp32s31/stop.esptrace
+# chip              esp32s31  target_id=0x0020  revision=0x0000
+# core              0  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=160
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=explicit_stop
+# app_elf_sha256    match  sha=04a6a7ec10b0c014  path=tests/built_apps/esp32s31.elf
+# rom_elf           missing-env  path=none
+# stats             core=0  instructions=60257  denominator=60257  top=20
+#    pct  count  function                          file:line
+   49.98  30115  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:31
+   24.97  15047  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:32
+   18.73  11286  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:35
+    6.24   3759  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:33
+    0.02     10  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:30
+    0.02     10  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:38
+    0.02     10  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:39
+    0.02     10  workload_task()                   /IDF_PROJECT/main/test_app_main.c:45
+    0.01      5  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:29
+    0.01      5  workload_task()                   /IDF_PROJECT/main/test_app_main.c:44
+# summary           instructions=60257  syncs=3  traps=0  gaps=5
+#                   top_gap_reasons=walker_not_anchored=3, alignment_lost=1, partial_frame=1
+#                   warnings=no_anchor=1
+#                   boundaries=wrap=1
+
+# esp-riscv-trace stats
+# source            tests/esp32s31/stop.esptrace
+# chip              esp32s31  target_id=0x0020  revision=0x0000
+# core              1  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=4080
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=explicit_stop
+# app_elf_sha256    match  sha=04a6a7ec10b0c014  path=tests/built_apps/esp32s31.elf
+# rom_elf           missing-env  path=none
+# stats             core=1  instructions=70611  denominator=70611  top=20
+#    pct  count  function                          file:line
+   49.98  35289  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:31
+   24.97  17631  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:32
+   18.73  13224  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:35
+    6.24   4407  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:33
+    0.02     12  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:30
+    0.02     12  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:38
+    0.02     12  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:39
+    0.02     12  workload_task()                   /IDF_PROJECT/main/test_app_main.c:45
+    0.01      6  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:29
+    0.01      6  workload_task()                   /IDF_PROJECT/main/test_app_main.c:44
+# summary           instructions=70611  syncs=4  traps=0  gaps=6
+#                   top_gap_reasons=walker_not_anchored=5, untraced=1
+#                   warnings=no_anchor=1
+#                   boundaries=wrap=1

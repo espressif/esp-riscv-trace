@@ -2,8 +2,8 @@
 
 The unit tests build their trace packets in Python. `test_captures.py` decodes real captures and compares the output
 with the `expected_*` files. For `decode` only the header, marker and summary lines are compared, because the full
-instruction listing is several MB per capture. A SHA-256 of the instruction lines pins them. `decode --last` and
-`history` outputs are compared in full.
+instruction listing is several MB per capture. A SHA-256 of the instruction lines pins them. `decode --last`,
+`history` and `stats` outputs are compared in full.
 
 `test_instruction_objdump.py` compares the instruction decoder with `riscv32-esp-elf-objdump` over every app ELF. It
 finds objdump on `PATH` or in the ESP-IDF tools directory and is skipped without it.
@@ -78,3 +78,6 @@ python tests/test_captures.py --update
 The script runs the CLI from the repository root, because the expected files hold the relative capture path in the
 `# source` line. It runs it without `IDF_PATH` and `ESP_ROM_ELF_DIR`, so ROM ELF lookup never changes the output.
 Review the diff of the `expected_*` files before committing them.
+
+`test_cli.py` also checks content of `esp32c5/stop.esptrace`, for example `branchy_work()` as the top row of `stats`.
+Replacing that capture can need updates there too.

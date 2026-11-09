@@ -23,8 +23,10 @@ from rich.markup import escape
 from . import __version__
 from .analysis.diagnostics import DiagnosticAccumulator, TraceDiagnostic
 from .analysis.history import History, HistoryBuilder, is_fault
+from .analysis.stats import StatsAccumulator, StatsSnapshot
 from .containers.base import Capture
 from .exporters import history as history_exporter
+from .exporters import stats_text as stats_exporter
 from .exporters import text as text_exporter
 from .ir.events import TraceEvent, TraceInstruction, TraceTrap
 from .session import CoreView, ShaMismatch, UsageError, iter_cores, open_session
@@ -36,8 +38,11 @@ EXIT_SHA_MISMATCH = 2
 EXIT_CORE_NOT_FOUND = 3
 EXIT_DECODE_FAILED = 4
 
+_DEFAULT_TOP = 20
 _DEFAULT_HISTORY_LAST = 40
 
+# One core's view with its stats snapshot and diagnostic
+_CoreStats = tuple[CoreView, StatsSnapshot, TraceDiagnostic]
 # One core's view with its history and diagnostic
 _CoreHistory = tuple[CoreView, History, TraceDiagnostic]
 
@@ -249,6 +254,86 @@ def _last_before_fault(sink: TextIO, events: Iterator[TraceEvent], last: int) ->
         ends = f"fault  cause={fault.cause}  epc={epc}"
     sink.write(f"# window            instructions={instructions}  omitted={dropped}  ends_at={ends}\n")
     yield from window
+
+
+# ---------------------------------------------------------------------------
+# stats command
+# ---------------------------------------------------------------------------
+
+
+@cli_group.command(
+    "stats",
+    short_help="produce per-source-line and per-block-fragment hit tables",
+    help=(
+        "Reconstruct the executed PC stream and aggregate hit counts "
+        "by (function, file, line) plus per-observed-block-fragment "
+        "entry PC. --elf is required because a stats table without "
+        "symbols is meaningless."
+    ),
+)
+@_capture_options
+@click.option(
+    "--top",
+    type=click.IntRange(min=0),
+    default=_DEFAULT_TOP,
+    help=f"show this many highest-count rows (default {_DEFAULT_TOP}). Must be zero or positive.",
+)
+@click.option("--per-block", is_flag=True, help="also print per-function block-fragment entry PC tables")
+@click.option(
+    "--merge-cores",
+    is_flag=True,
+    help="sum stats across every selected core and render one combined table instead of one per core",
+)
+@click.option("--debug", is_flag=True, help="dump each core's raw encoder buffer after the snapshot header")
+def _cmd_stats(top: int, per_block: bool, merge_cores: bool, debug: bool, **capture: Any) -> int:
+    args = _CaptureArgs(**capture)
+    with _session_views(args, require_elf=True) as views:
+        per_core = [_collect_stats(view) for view in views]
+        with _out_sink(args.out) as sink:
+            _render_stats(sink, per_core, top=top, per_block=per_block, merge_cores=merge_cores, debug=debug)
+    if not args.quiet:
+        _print_summary(views, [diag for _view, _snap, diag in per_core])
+    return EXIT_OK
+
+
+def _collect_stats(view: CoreView) -> _CoreStats:
+    """Run the statistics and diagnostic accumulators over one core."""
+    session = view.session
+    if session.resolver is None:
+        raise UsageError("--elf is required for this command")
+    stats_acc = StatsAccumulator(session.image, session.resolver)
+    diag_acc = DiagnosticAccumulator()
+    for ev in view.events():
+        stats_acc.push(ev)
+        diag_acc.push(ev)
+    return view, stats_acc.close(), diag_acc.close(view.note)
+
+
+def _render_stats(
+    sink: TextIO,
+    per_core: Sequence[_CoreStats],
+    *,
+    top: int,
+    per_block: bool,
+    merge_cores: bool,
+    debug: bool,
+) -> None:
+    if merge_cores:
+        for i, (view, _snap, _diag) in enumerate(per_core):
+            _write_header(sink, view, "stats", first=i == 0, debug=debug)
+        merged = StatsSnapshot.merge(snap for _view, snap, _diag in per_core)
+        label = "cores=" + ",".join(str(view.core.core_id) for view, _snap, _diag in per_core)
+        _write_lines(sink, stats_exporter.format_stats(merged, top=top, per_block=per_block, label=label))
+        for view, _snap, diag in per_core:
+            sink.write(f"\n# core-diagnostic   core={view.core.core_id}\n")
+            _write_lines(sink, text_exporter.format_diagnostic(diag))
+        return
+
+    for i, (view, snapshot, diag) in enumerate(per_core):
+        _write_header(sink, view, "stats", first=i == 0, debug=debug)
+        label = f"core={view.core.core_id}"
+        _write_lines(sink, stats_exporter.format_stats(snapshot, top=top, per_block=per_block, label=label))
+        _write_lines(sink, text_exporter.format_diagnostic(diag))
 
 
 # ---------------------------------------------------------------------------
