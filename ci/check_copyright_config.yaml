@@ -5,6 +5,7 @@ esp_riscv_trace:
   perform_check: yes
   include:
     - 'esp_riscv_trace/'
+    - 'tests/'
   allowed_licenses:
     - Apache-2.0
   license_for_new_files: Apache-2.0
