@@ -46,6 +46,7 @@ CASES: list[tuple[str, str, str, str, list[str], str]] = (
             "_and_panic_stop",
         ),
         ("history", "esp32s31", "coredump.elf", "esp32s31.elf", ["--last", "8", "--json"], "_json"),
+        ("profile", "esp32c5", "coredump.elf", "esp32c5.elf", [], ""),
     ]
     + [("history", *capture, [], "") for capture in CAPTURES if capture[1] == "coredump.elf"]
 )

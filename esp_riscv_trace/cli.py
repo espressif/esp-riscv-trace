@@ -23,9 +23,11 @@ from rich.markup import escape
 from . import __version__
 from .analysis.diagnostics import DiagnosticAccumulator, TraceDiagnostic
 from .analysis.history import History, HistoryBuilder, is_fault
+from .analysis.profile import Profile, ProfileAccumulator
 from .analysis.stats import StatsAccumulator, StatsSnapshot
 from .containers.base import Capture
 from .exporters import history as history_exporter
+from .exporters import profile as profile_exporter
 from .exporters import stats_text as stats_exporter
 from .exporters import text as text_exporter
 from .ir.events import TraceEvent, TraceInstruction, TraceTrap
@@ -390,6 +392,65 @@ def _render_stats_of_captures(
         _write_lines(
             sink, stats_exporter.format_stats(StatsSnapshot.merge(snaps), top=top, per_block=per_block, label=label)
         )
+
+
+# ---------------------------------------------------------------------------
+# profile command
+# ---------------------------------------------------------------------------
+
+
+@cli_group.command(
+    "profile",
+    short_help="write the call stacks the instructions ran under, for a flame graph",
+    help=(
+        "Reconstruct the executed PC stream, follow the call stack effect of each jump, and count "
+        "every instruction under its call stack. Writes folded stacks for FlameGraph, or a "
+        "speedscope file. Counts are retired instructions, not time. With several captures, the "
+        "stacks of each core are summed. --elf is required to name the functions."
+    ),
+)
+@_captures_options
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["folded", "speedscope"]),
+    default="folded",
+    help="folded stacks, one per line (default), or a speedscope JSON file",
+)
+@click.option("--merge-cores", is_flag=True, help="sum every core into one profile instead of one per core")
+def _cmd_profile(fmt: str, merge_cores: bool, **capture: Any) -> int:
+    args = _CaptureArgs(**capture)
+    with _session_views(args, require_elf=True) as views:
+        per_core = [_collect_profile(view) for view in views]
+        by_core: dict[int, list[Profile]] = {}
+        for view, profile, _diag in per_core:
+            by_core.setdefault(view.core.core_id, []).append(profile)
+        if merge_cores:
+            name = "cores " + ",".join(str(core_id) for core_id in sorted(by_core))
+            named = [(name, Profile.merge(p for core_id in sorted(by_core) for p in by_core[core_id]))]
+        else:
+            named = [(f"core {core_id}", Profile.merge(by_core[core_id])) for core_id in sorted(by_core)]
+        with _out_sink(args.out) as sink:
+            if fmt == "folded":
+                _write_lines(sink, profile_exporter.format_folded([(None if merge_cores else n, p) for n, p in named]))
+            else:
+                captures = args.captures
+                title = str(captures[0]) if len(captures) == 1 else f"{len(captures)} captures"
+                json.dump(profile_exporter.profile_to_speedscope(named, title), sink)
+                sink.write("\n")
+    if not args.quiet:
+        _print_summary(views, [diag for _view, _profile, diag in per_core])
+    return EXIT_OK
+
+
+def _collect_profile(view: CoreView) -> tuple[CoreView, Profile, TraceDiagnostic]:
+    """Run the profile and diagnostic accumulators over one core."""
+    profile_acc = ProfileAccumulator(view.session.image)
+    diag_acc = DiagnosticAccumulator()
+    for ev in view.events():
+        profile_acc.push(ev)
+        diag_acc.push(ev)
+    return view, profile_acc.close(), diag_acc.close(view.note)
 
 
 # ---------------------------------------------------------------------------

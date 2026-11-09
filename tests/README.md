@@ -3,7 +3,7 @@
 The unit tests build their trace packets in Python. `test_captures.py` decodes real captures and compares the output
 with the `expected_*` files. For `decode` only the header, marker and summary lines are compared, because the full
 instruction listing is several MB per capture. A SHA-256 of the instruction lines pins them. `decode --last`,
-`history` and `stats` outputs are compared in full.
+`history`, `stats` and `profile` outputs are compared in full.
 
 `test_instruction_objdump.py` compares the instruction decoder with `riscv32-esp-elf-objdump` over every app ELF. It
 finds objdump on `PATH` or in the ESP-IDF tools directory and is skipped without it.

@@ -4,7 +4,8 @@ Decoder for RISC-V hardware instruction trace captured on Espressif chips.
 
 It reads OpenOCD `.esptrace` captures and `esp-coredump` core ELFs with a trace note. It reconstructs the executed
 program flow, resolves each PC to a function and source line through the app ELF, and writes a text dump, a hot-spot
-table or the call history that led to a crash. Lost instruction continuity is reported as a gap.
+table, the call history that led to a crash, or call stacks for a flame graph. Lost instruction continuity is reported
+as a gap.
 
 It is a command-line tool. Other tools, such as `esp-coredump`, read captures through the
 [Python API](#python-api). The other modules are internal and have no stable API.
@@ -72,6 +73,7 @@ The application must not start the trace at boot. Reset the target and let it bo
 openocd -f board/esp32s31-builtin.cfg -f sample.tcl \
     -c "init; reset run; sleep 2000; riscv_trace_sample s 100; shutdown"   # s_0000.esptrace to s_0099.esptrace
 esp-riscv-trace stats s_*.esptrace --elf build/app.elf
+esp-riscv-trace profile s_*.esptrace --elf build/app.elf --format speedscope --out app.speedscope.json
 ```
 
 The counts are retired instructions, not time. The trace has no timestamps, so cache misses, wait states and idle
@@ -89,6 +91,7 @@ esp-riscv-trace stats trace.esptrace --elf build/app.elf --top 20     # hottest 
 esp-riscv-trace stats trace.esptrace --elf build/app.elf --merge-cores --per-block
 esp-riscv-trace history coredump.elf --elf build/app.elf              # calls and returns that led to the crash
 esp-riscv-trace decode coredump.elf --elf build/app.elf --last 50     # last 50 instructions before the crash
+esp-riscv-trace profile trace.esptrace --elf build/app.elf > app.folded  # call stacks for a flame graph
 ```
 
 Without `--elf`, `decode` still runs but prints functions as `?()`. ROM addresses resolve through `--rom-elf` or the
@@ -100,6 +103,7 @@ ESP-IDF environment.
 esp-riscv-trace decode  <capture> [options]
 esp-riscv-trace stats   <capture>... --elf PATH [options]
 esp-riscv-trace history <capture> --elf PATH [options]
+esp-riscv-trace profile <capture>... --elf PATH [options]
 ```
 
 `-h` or `--help` after a command lists its options. The command output goes to stdout or `--out`. Warnings, errors
@@ -109,7 +113,7 @@ Options for every command:
 
 | Option | Meaning |
 | --- | --- |
-| `--elf PATH` | Application ELF for function names and source lines. Required by `stats` and `history` |
+| `--elf PATH` | Application ELF for function names and source lines. Required by `stats`, `history` and `profile` |
 | `--rom-elf PATH` | ROM ELF for ROM addresses (requires `--elf`). Without it, the ESP-IDF environment is searched |
 | `--core N` | Process only this core |
 | `--chip NAME` | Override the chip recorded in the capture. One of the [supported chips](#supported-chips), written like `esp32c5` |
@@ -143,6 +147,19 @@ and core, and one table per core with the counts of every capture summed.
 | --- | --- |
 | `--last N` | Number of newest outline items (default 40). `0` shows every item |
 | `--json` | Write JSON instead of text |
+
+`profile` adds:
+
+| Option | Meaning |
+| --- | --- |
+| `--format folded` | One `core 0;caller;function count` line per call stack, for FlameGraph or speedscope (default) |
+| `--format speedscope` | A [speedscope](https://www.speedscope.app) file with one profile per core |
+| `--merge-cores` | Combine all cores into one profile |
+
+`profile` counts every instruction under the call stack it ran in, outermost function first. A trap adds a frame
+such as `[interrupt 21]` or `[illegal instruction]` above the interrupted function. The trace starts inside running
+code, so a stack holds only the calls the trace shows, and a gap starts over with no frames. Counts are retired
+instructions. The speedscope samples are in trace order, so its time order view follows the trace.
 
 ### Exit codes
 
@@ -229,6 +246,21 @@ context switch and the next one.
    24.97  12092  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:32
    18.73   9069  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:35
 ```
+
+`profile` writes one line per call stack with the instructions retired in it. Some lines of
+`esp-riscv-trace profile tests/esp32c5/coredump.elf --elf tests/built_apps/esp32c5.elf`:
+
+```text
+core 0;[interrupt 21];_interrupt_handler;rtos_int_exit;vTaskSwitchContext 75
+core 0;app_main;abort 83
+core 0;app_main;abort;esp_system_abort;panic_abort 5
+core 0;app_main;abort;esp_system_abort;panic_abort;[illegal instruction];_panic_handler 53
+core 0;app_main;strcmp 23
+```
+
+The same capture with `--format speedscope`, in the Left Heavy view of [speedscope](https://www.speedscope.app):
+
+![speedscope Left Heavy view of the profile](./docs/images/profile-speedscope.png)
 
 ## Python API
 

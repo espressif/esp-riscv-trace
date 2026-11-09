@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from helpers import BAR, FOO, IMAGE, ISR, MAIN, SCHEDULER, TASK_B, Trace
 
 from esp_riscv_trace.analysis.history import (
     CodeLoop,
@@ -12,120 +12,12 @@ from esp_riscv_trace.analysis.history import (
     HistoryEntry,
     HistoryKind,
     HistoryLoop,
-    build_history,
 )
 from esp_riscv_trace.decoder.reconstruct import GapReason
-from esp_riscv_trace.elf import CodeReadError
 from esp_riscv_trace.exporters.history import format_history
-from esp_riscv_trace.ir.events import (
-    InsnClass,
-    LinkKind,
-    TraceEvent,
-    TraceGap,
-    TraceInstruction,
-    TraceSync,
-    TraceTrap,
-)
-
-MAIN = 0x1000
-FOO = 0x2000
-BAR = 0x3000
-ISR = 0x4000
-TASK_B = 0x5000
-SCHEDULER = 0x6000
-_FUNCTION_SIZE = 0x1000
 
 _STORE_ACCESS_FAULT = 7
 _TIMER_IRQ = 7
-
-
-class RangeImage:
-    """Code image that names the function of each 4 KiB range and has no code bytes."""
-
-    NAMES: ClassVar[dict[int, str]] = {
-        MAIN: "main",
-        FOO: "foo",
-        BAR: "bar",
-        ISR: "isr",
-        TASK_B: "task_b",
-        SCHEDULER: "vTaskSwitchContext",
-    }
-
-    def read(self, vaddr: int, size: int) -> bytes:
-        raise CodeReadError(f"0x{vaddr:08x} has no code")
-
-    def symbol_at(self, vaddr: int) -> str | None:
-        return self.NAMES.get(vaddr & ~(_FUNCTION_SIZE - 1))
-
-
-IMAGE = RangeImage()
-
-
-class Trace:
-    """Builds the events the decoder yields for a made-up run."""
-
-    def __init__(self) -> None:
-        self.events: list[TraceEvent] = []
-
-    def sync(self, pc: int) -> Trace:
-        self.events.append(TraceSync(pc=pc, privilege=3, provenance=None))
-        return self
-
-    def run(self, pc: int, count: int = 1) -> Trace:
-        """Retire ``count`` instructions from ``pc`` on that do not jump."""
-        for i in range(count):
-            self._insn(pc + 4 * i, InsnClass.NONE, pc + 4 * i + 4)
-        return self
-
-    def call(self, pc: int, target: int | None) -> Trace:
-        return self._insn(pc, InsnClass.UNINFERABLE, target, LinkKind.CALL)
-
-    def ret(self, pc: int, target: int | None) -> Trace:
-        return self._insn(pc, InsnClass.UNINFERABLE, target, LinkKind.RETURN)
-
-    def jump(self, pc: int, target: int) -> Trace:
-        return self._insn(pc, InsnClass.JUMP, target, LinkKind.JUMP)
-
-    def branch(self, pc: int, target: int) -> Trace:
-        """Retire a conditional branch that is taken."""
-        self.events.append(
-            TraceInstruction(pc=pc, length=4, cls=InsnClass.BRANCH, branch_taken=True, next_pc=target, provenance=None)
-        )
-        return self
-
-    def mret(self, pc: int, target: int) -> Trace:
-        return self._insn(pc, InsnClass.UNINFERABLE, target, LinkKind.TRAP_RETURN)
-
-    def trap(
-        self, cause: int, *, epc: int, handler: int = ISR, interrupt: bool = False, tval: int | None = None
-    ) -> Trace:
-        self.events.append(
-            TraceTrap(
-                cause=cause,
-                interrupt=interrupt,
-                handler_pc=handler,
-                interrupted_pc=epc if interrupt else None,
-                tval=tval,
-                provenance=None,
-                epc=epc,
-            )
-        )
-        return self
-
-    def gap(self, reason: str = GapReason.INDEX_JUMP) -> Trace:
-        self.events.append(TraceGap(reason=reason, detail="", provenance=None))
-        return self
-
-    def history(
-        self, *, last: int = 0, image: RangeImage | None = IMAGE, end_interrupts: tuple[int, ...] = ()
-    ) -> History:
-        return build_history(self.events, image, last=last, end_interrupts=end_interrupts)
-
-    def _insn(self, pc: int, cls: InsnClass, next_pc: int | None, link: LinkKind = LinkKind.NONE) -> Trace:
-        self.events.append(
-            TraceInstruction(pc=pc, length=4, cls=cls, branch_taken=None, next_pc=next_pc, provenance=None, link=link)
-        )
-        return self
 
 
 def _outline(history: History) -> list[tuple[HistoryKind, int, int | None, int | None]]:
