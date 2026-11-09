@@ -8,6 +8,9 @@ import dataclasses
 import struct
 from pathlib import Path
 
+from esp_riscv_trace.containers.base import TraceBuffer
+from esp_riscv_trace.decoder.framing import Frame
+from esp_riscv_trace.decoder.packets import SyncPacket
 from esp_riscv_trace.elf import CodeReadError
 from esp_riscv_trace.elf.dwarf import SourceLocation
 from esp_riscv_trace.snapshot import abi
@@ -18,6 +21,8 @@ APPS = TESTS / "built_apps"
 
 C5_STOP = TESTS / "esp32c5" / "stop.esptrace"
 C5_ELF = APPS / "esp32c5.elf"
+
+BASE = 0x40800000
 
 
 class FakeImage:
@@ -49,6 +54,56 @@ class FakeResolver:
 
     def resolve(self, pc: int) -> SourceLocation | None:
         return self._locs.get(pc)
+
+
+def make_frame(index: int = 0, payload: bytes = b"") -> Frame:
+    """Frame whose stream offset and packet index are both ``index``."""
+    return Frame(segment_index=0, stream_offset=index, length=len(payload), packet_index=index, payload=payload)
+
+
+def make_sync(pc: int, *, branch: int) -> SyncPacket:
+    """Sync packet at ``pc`` in frame 0."""
+    return SyncPacket(frame=make_frame(0), branch=branch, privilege=0, raw_address=pc >> 1, pc=pc)
+
+
+def pack_bits(*fields: tuple[int, int]) -> bytes:
+    """Pack ``(value, width)`` fields LSB first into the fewest whole bytes."""
+    value = 0
+    position = 0
+    for field, width in fields:
+        value |= field << position
+        position += width
+    return value.to_bytes((position + 7) // 8, "little")
+
+
+def make_buffer(
+    raw: bytes,
+    *,
+    head: int,
+    memory_mode: int = int(abi.MemoryMode.LOOP),
+    wrap_state: int = int(abi.WrapState.WRAPPED),
+    fifo_overflow: bool = False,
+    head_valid: bool = True,
+) -> TraceBuffer:
+    """Frozen ET 2.0 core 0 buffer holding ``raw`` with its write head at ``head``."""
+    return TraceBuffer(
+        core_id=0,
+        raw=raw,
+        capacity=len(raw),
+        head_offset=head,
+        memory_mode=memory_mode,
+        wrap_state=wrap_state,
+        packet_format=int(abi.PacketFormat.EFFICIENT_TRACE_2_0),
+        address_mode=int(abi.AddressMode.FULL),
+        fifo_status_raw=0,
+        intr_status_raw=0,
+        owner=int(abi.Owner.FW),
+        state=int(abi.State.FROZEN),
+        head_valid=head_valid,
+        encoder_params=None,
+        segment_index=None,
+        fifo_overflow=fifo_overflow,
+    )
 
 
 def pack_struct(fmt: str, defaults: dict[str, object], overrides: dict[str, object]) -> bytes:
