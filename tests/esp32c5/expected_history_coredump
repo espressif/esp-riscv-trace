@@ -1,0 +1,52 @@
+# esp-riscv-trace history
+# source            tests/esp32c5/coredump.elf
+# chip              esp32c5  target_id=0x0017  revision=0x0065
+# core              0  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=2256
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=panic
+# app_elf_sha256    match  sha=e09eeed40648e3d7  path=tests/built_apps/esp32c5.elf
+# rom_elf           missing-env  path=none
+# history           core=0  items=40  omitted=496  instructions=4617
+# fault             illegal instruction in panic_abort  epc=0x40806e94  tval=0x00000000
+#         pc    insns  outline                                                                   source
+0x408020dc        8            xTaskGetSchedulerState()                                        /IDF/components/esp_libc/src/locks.c:192
+0x4080215c        8            xQueueGiveMutexRecursive() {                                    /IDF/components/esp_libc/src/locks.c:209
+0x42012b2c        3              xTaskGetCurrentTaskHandle()                                   /IDF/components/freertos/FreeRTOS-Kernel/queue.c:773
+0x42012b78       18              xQueueGenericSend() {                                         /IDF/components/freertos/FreeRTOS-Kernel/queue.c:789
+0x420128be        8                xTaskGetSchedulerState()                                    /IDF/components/freertos/FreeRTOS-Kernel/queue.c:941
+0x42012a16        6                vPortEnterCritical() {                                      /IDF/components/freertos/FreeRTOS-Kernel/queue.c:950
+0x40807318        3                  xPortSetInterruptMaskFromISR()                            /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:656
+0x42012a1a        9                } vPortEnterCritical                                        /IDF/components/freertos/FreeRTOS-Kernel/queue.c:956
+0x42012978       15                prvCopyDataToQueue() {                                      /IDF/components/freertos/FreeRTOS-Kernel/queue.c:964
+0x408075da       22                  xTaskPriorityDisinherit()                                 /IDF/components/freertos/FreeRTOS-Kernel/queue.c:2469
+0x4201297c        7                } prvCopyDataToQueue                                        /IDF/components/freertos/FreeRTOS-Kernel/queue.c:966
+0x42012996       20                vPortExitCritical() {                                       /IDF/components/freertos/FreeRTOS-Kernel/queue.c:1056
+0x408073a0        5                  vPortClearInterruptMaskFromISR()                          /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:683
+0x4201299a        8                } vPortExitCritical                                         /IDF/components/freertos/FreeRTOS-Kernel/queue.c:1057
+0x42012b7a        8              } xQueueGenericSend                                           /IDF/components/freertos/FreeRTOS-Kernel/queue.c:789
+0x40802160        6            } xQueueGiveMutexRecursive                                      /IDF/components/esp_libc/src/locks.c:209
+0x40802236        3          } lock_release_generic                                            /IDF/components/esp_libc/src/locks.c:224
+0x40802366        3        } _lock_release_recursive                                           /IDF/components/esp_libc/src/locks.c:360
+0x4200fac2        6      } __retarget_lock_release_recursive
+0x42009bec       17    } getc                                                                  /IDF_PROJECT/main/test_app_main.c:60
+0x42009cec        5  } read_command                                                            /IDF_PROJECT/main/test_app_main.c:101
+0x42009cfa       23  strcmp()                                                                  /IDF_PROJECT/main/test_app_main.c:101
+0x42009cba       14  abort() {                                                                 /IDF_PROJECT/main/test_app_main.c:102
+0x40805ae2        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:25
+0x40805af4        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:27
+0x40805b04        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:28
+                 39    loop x4 {
+0x40805b3e        0      <untraced>()                                                          /IDF/components/esp_libc/src/abort.c:35
+                       }
+0x40805b2a        3    esp_system_abort() {                                                    /IDF/components/esp_libc/src/abort.c:38
+0x40806e50        5      panic_abort() {                                                       /IDF/components/esp_system/port/esp_system_chip.c:88
+0x40806e94        0        !! illegal instruction in panic_abort  epc=0x40806e94  tval=0x00000000  /IDF/components/esp_system/panic.c:508
+# summary           instructions=4751  syncs=23  traps=2  gaps=29
+#                   top_gap_reasons=untraced=22, walker_not_anchored=3, packet_index_jump=2
+#                   boundaries=wrap=1
+#                   repeated_gaps=walker_not_anchored "format 1 with address before first sync, cannot anchor" x2

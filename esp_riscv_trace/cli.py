@@ -7,6 +7,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import functools
+import json
 import sys
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
@@ -21,8 +22,9 @@ from rich.markup import escape
 
 from . import __version__
 from .analysis.diagnostics import DiagnosticAccumulator, TraceDiagnostic
-from .analysis.history import is_fault
+from .analysis.history import History, HistoryBuilder, is_fault
 from .containers.base import Capture
+from .exporters import history as history_exporter
 from .exporters import text as text_exporter
 from .ir.events import TraceEvent, TraceInstruction, TraceTrap
 from .session import CoreView, ShaMismatch, UsageError, iter_cores, open_session
@@ -33,6 +35,11 @@ EXIT_USAGE = 1
 EXIT_SHA_MISMATCH = 2
 EXIT_CORE_NOT_FOUND = 3
 EXIT_DECODE_FAILED = 4
+
+_DEFAULT_HISTORY_LAST = 40
+
+# One core's view with its history and diagnostic
+_CoreHistory = tuple[CoreView, History, TraceDiagnostic]
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -242,6 +249,86 @@ def _last_before_fault(sink: TextIO, events: Iterator[TraceEvent], last: int) ->
         ends = f"fault  cause={fault.cause}  epc={epc}"
     sink.write(f"# window            instructions={instructions}  omitted={dropped}  ends_at={ends}\n")
     yield from window
+
+
+# ---------------------------------------------------------------------------
+# history command
+# ---------------------------------------------------------------------------
+
+
+@cli_group.command(
+    "history",
+    short_help="outline the calls, returns, interrupts and context switches that led to the crash",
+    help=(
+        "Reconstruct the executed PC stream and follow the call stack effect of each jump to "
+        "outline, per core, the calls and returns, interrupts, context switches and gaps up to "
+        "the first fault (an exception other than ecall). Repeated passes of a loop show once "
+        "with their count. --elf is required to name the functions."
+    ),
+)
+@_capture_options
+@click.option(
+    "--last",
+    type=click.IntRange(min=0),
+    default=_DEFAULT_HISTORY_LAST,
+    help=f"show this many newest outline items (default {_DEFAULT_HISTORY_LAST}). 0 shows every item",
+)
+@click.option("--json", "as_json", is_flag=True, help="write JSON instead of text")
+def _cmd_history(last: int, as_json: bool, **capture: Any) -> int:
+    args = _CaptureArgs(**capture)
+    with _session_views(args, require_elf=True) as views:
+        per_core = [_collect_history(view, last) for view in views]
+        with _out_sink(args.out) as sink:
+            if as_json:
+                _write_history_json(sink, per_core)
+            else:
+                _write_history_text(sink, per_core)
+    if not args.quiet:
+        _print_summary(views, [diag for _view, _history, diag in per_core])
+    return EXIT_OK
+
+
+def _collect_history(view: CoreView, last: int) -> _CoreHistory:
+    """Build one core's history and the diagnostic of its whole trace."""
+    builder = HistoryBuilder(view.session.image)
+    diag_acc = DiagnosticAccumulator()
+    for ev in view.events():
+        builder.push(ev)
+        diag_acc.push(ev)
+    return view, builder.close(last), diag_acc.close(view.note)
+
+
+def _write_history_text(sink: TextIO, per_core: Sequence[_CoreHistory]) -> None:
+    for i, (view, history, diag) in enumerate(per_core):
+        _write_header(sink, view, "history", first=i == 0, debug=False)
+        session = view.session
+        label = f"core={view.core.core_id}"
+        _write_lines(sink, history_exporter.format_history(history, session.image, session.resolver, label=label))
+        _write_lines(sink, text_exporter.format_diagnostic(diag))
+
+
+def _write_history_json(sink: TextIO, per_core: Sequence[_CoreHistory]) -> None:
+    cores = []
+    for view, history, diag in per_core:
+        note = view.note
+        session = view.session
+        cores.append(
+            {
+                "core": view.core.core_id,
+                "chip": note.chip,
+                "source": note.source,
+                "elf_sha256_status": str(note.elf_sha_status),
+                "summary": {
+                    "instructions": diag.instructions,
+                    "syncs": diag.syncs,
+                    "traps": diag.traps,
+                    "gaps": diag.gaps,
+                },
+                "history": history_exporter.history_to_dict(history, session.image, session.resolver),
+            }
+        )
+    json.dump({"command": "history", "cores": cores}, sink, indent=2)
+    sink.write("\n")
 
 
 # ---------------------------------------------------------------------------

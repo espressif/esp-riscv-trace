@@ -30,10 +30,15 @@ CAPTURES = [
 ]
 
 # (command, target, capture, app ELF, extra args, expected file suffix)
-CASES: list[tuple[str, str, str, str, list[str], str]] = [("decode", *capture, [], "") for capture in CAPTURES] + [
-    ("decode", "esp32s31", "stop.esptrace", "esp32s31.elf", ["--core", "1"], "_core1"),
-    ("decode", "esp32c5", "coredump.elf", "esp32c5.elf", ["--last", "20"], "_last"),
-]
+CASES: list[tuple[str, str, str, str, list[str], str]] = (
+    [("decode", *capture, [], "") for capture in CAPTURES]
+    + [
+        ("decode", "esp32s31", "stop.esptrace", "esp32s31.elf", ["--core", "1"], "_core1"),
+        ("decode", "esp32c5", "coredump.elf", "esp32c5.elf", ["--last", "20"], "_last"),
+        ("history", "esp32s31", "coredump.elf", "esp32s31.elf", ["--last", "8", "--json"], "_json"),
+    ]
+    + [("history", *capture, [], "") for capture in CAPTURES if capture[1] == "coredump.elf"]
+)
 
 
 def expected_path(cmd: str, target: str, capture: str, suffix: str) -> Path:
