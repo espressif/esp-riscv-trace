@@ -31,7 +31,9 @@ classifiers = [
 ]
 dependencies = [
     "pyelftools>=0.29",
-    "esp-pylib[cli]>=1.2.1",
+    "esp-pylib[cli,ide]>=1.2.1",
+    "rich",
+    "rich-click>=1.7,<2",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +45,9 @@ dev = [
 test = [
     "pytest",
 ]
+
+[project.scripts]
+esp-riscv-trace = "esp_riscv_trace.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/espressif/esp-riscv-trace"

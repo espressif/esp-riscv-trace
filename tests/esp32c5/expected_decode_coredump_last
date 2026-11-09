@@ -1,0 +1,41 @@
+# esp-riscv-trace decode
+# source            tests/esp32c5/coredump.elf
+# chip              esp32c5  target_id=0x0017  revision=0x0065
+# core              0  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=2256
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=panic
+# app_elf_sha256    match  sha=e09eeed40648e3d7  path=tests/built_apps/esp32c5.elf
+# rom_elf           missing-env  path=none
+# window            instructions=20  omitted=4597  ends_at=fault  cause=2  epc=0x40806e94
+0x40805b32  abort()                           /IDF/components/esp_libc/src/abort.c:35  [frame seg=1 off=3991 idx=2346]
+0x40805b34  abort()                           /IDF/components/esp_libc/src/abort.c:35  [frame seg=1 off=3991 idx=2346]
+0x40805b36  abort()                           /IDF/components/esp_libc/src/abort.c:35  [frame seg=1 off=3991 idx=2346]
+0x40805b38  abort()                           /IDF/components/esp_libc/src/abort.c:35  [frame seg=1 off=3991 idx=2346]
+0x40805b3a  abort()                           /IDF/components/esp_libc/src/abort.c:35  [frame seg=1 off=3991 idx=2346]
+0x40805b3e  abort()                           /IDF/components/esp_libc/src/abort.c:35  [frame seg=1 off=3997 idx=2347]  # uninferable next=untraced
+--- gap untraced "the jump at 0x40805b3e leaves the traced range (qual_status=1)" [frame seg=1 off=3997 idx=2347] ---
+--- sync pc=0x40805b42 priv=1 [frame seg=1 off=4002 idx=2348] ---
+0x40805b42  abort()                           /IDF/components/esp_libc/src/abort.c:34  [frame seg=1 off=4002 idx=2348]
+0x40805b44  abort()                           /IDF/components/esp_libc/src/abort.c:34  [frame seg=1 off=4002 idx=2348]  # jump next=0x40805b22
+0x40805b22  abort()                           /IDF/components/esp_libc/src/abort.c:34  [frame seg=1 off=4002 idx=2348]
+0x40805b24  abort()                           /IDF/components/esp_libc/src/abort.c:34  [frame seg=1 off=4010 idx=2349]  # branch=not_taken
+0x40805b28  abort()                           /IDF/components/esp_libc/src/abort.c:38  [frame seg=1 off=4010 idx=2349]
+0x40805b2a  abort()                           /IDF/components/esp_libc/src/abort.c:38  [frame seg=1 off=4010 idx=2349]  # jump next=0x40806e4c
+0x40806e4c  esp_system_abort()                /IDF/components/esp_system/port/esp_system_chip.c:87  [frame seg=1 off=4010 idx=2349]
+0x40806e4e  esp_system_abort()                /IDF/components/esp_system/port/esp_system_chip.c:87  [frame seg=1 off=4010 idx=2349]
+0x40806e50  esp_system_abort()                /IDF/components/esp_system/port/esp_system_chip.c:88  [frame seg=1 off=4010 idx=2349]  # jump next=0x40806e82
+0x40806e82  panic_abort()                     /IDF/components/esp_system/panic.c:502  [frame seg=1 off=4010 idx=2349]
+0x40806e86  panic_abort()                     /IDF/components/esp_system/panic.c:502  [frame seg=1 off=4010 idx=2349]
+0x40806e88  panic_abort()                     /IDF/components/esp_system/panic.c:502  [frame seg=1 off=4010 idx=2349]
+0x40806e8c  panic_abort()                     /IDF/components/esp_system/panic.c:503  [frame seg=1 off=4010 idx=2349]
+0x40806e90  panic_abort()                     /IDF/components/esp_system/panic.c:503  [frame seg=1 off=4010 idx=2349]
+--- trap cause=2 async=0 handler=0x40800000 epc=0x40806e94 tval=0x00000000 [frame seg=1 off=4017 idx=2350] ---
+# summary           instructions=4751  syncs=23  traps=2  gaps=29
+#                   top_gap_reasons=untraced=22, walker_not_anchored=3, packet_index_jump=2
+#                   boundaries=wrap=1
+#                   repeated_gaps=walker_not_anchored "format 1 with address before first sync, cannot anchor" x2

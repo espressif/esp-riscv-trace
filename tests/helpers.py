@@ -1,18 +1,27 @@
 # SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
-"""Shared fakes, builders and paths for the tests."""
+"""Shared fakes, builders, paths and CLI runners for the tests."""
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
+import functools
+import io
+import os
 import struct
+import subprocess
+import sys
 from pathlib import Path
+from unittest import mock
 
+from esp_riscv_trace import cli
 from esp_riscv_trace.containers.base import TraceBuffer
 from esp_riscv_trace.decoder.framing import Frame
 from esp_riscv_trace.decoder.packets import SyncPacket
 from esp_riscv_trace.elf import CodeReadError
 from esp_riscv_trace.elf.dwarf import SourceLocation
+from esp_riscv_trace.ir.capture_note import ElfShaStatus, TraceCaptureNote
 from esp_riscv_trace.snapshot import abi
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,10 +30,14 @@ APPS = TESTS / "built_apps"
 
 C5_STOP = TESTS / "esp32c5" / "stop.esptrace"
 C5_ELF = APPS / "esp32c5.elf"
+S31_ELF = APPS / "esp32s31.elf"
 
 BASE = 0x40800000
 NOP = bytes.fromhex("13000000")
 JALR_X0_RA = bytes.fromhex("67800000")
+
+# Environment that turns on ROM ELF auto-detection
+IDF_ENV_VARS = ("IDF_PATH", "ESP_ROM_ELF_DIR")
 
 
 class FakeImage:
@@ -193,3 +206,97 @@ def pack_core_desc(**overrides) -> bytes:
 def pack_encoder_params(**overrides) -> bytes:
     """Encoder parameter bytes with ``overrides`` applied."""
     return pack_struct(abi._ENCODER_PARAMS_FMT, ENCODER_PARAMS_DEFAULTS, overrides)
+
+
+_NOTE_DEFAULTS = dict(
+    source="test",
+    chip="esp32c5",
+    target_id=0x0017,
+    chip_revision=0x0064,
+    core_id=0,
+    owner="fw",
+    packet_format="efficient_trace_2_0",
+    address_mode="full",
+    memory_mode="loop",
+    resync_mode="packet",
+    resync_threshold=32,
+    wrap_state="wrapped",
+    capacity=40,
+    head_offset=16,
+    fifo_status_raw=0,
+    intr_status_raw=0,
+    fifo_empty=True,
+    memory_full=False,
+    fifo_overflow=False,
+    capture_reason="panic",
+    elf_sha_status=ElfShaStatus.MATCH,
+    elf_sha256=None,
+    snapshot_app_elf_sha256=None,
+    elf_path=None,
+    wrap_reason=None,
+)
+
+
+def make_note(**overrides) -> TraceCaptureNote:
+    """ESP32-C5 capture note with ``overrides`` applied."""
+    return TraceCaptureNote(**{**_NOTE_DEFAULTS, **overrides})
+
+
+@dataclasses.dataclass(frozen=True)
+class CliResult:
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+def _check_exit(result: CliResult, expect: int | None) -> CliResult:
+    if expect is not None:
+        assert result.returncode == expect, (
+            f"expected exit {expect}, got {result.returncode}\nstdout=\n{result.stdout}\nstderr=\n{result.stderr}"
+        )
+    return result
+
+
+@contextlib.contextmanager
+def _cli_env(idf_env: bool):
+    with mock.patch.dict(os.environ):
+        if not idf_env:
+            for name in IDF_ENV_VARS:
+                os.environ.pop(name, None)
+        yield
+
+
+@functools.cache
+def _run_main_cached(args: tuple[str, ...], idf_env: bool) -> CliResult:
+    out, err = io.StringIO(), io.StringIO()
+    with _cli_env(idf_env), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            rc = cli.main(list(args))
+        except SystemExit as exc:
+            rc = exc.code if isinstance(exc.code, int) else cli.EXIT_USAGE
+    return CliResult(rc, out.getvalue(), err.getvalue())
+
+
+def run_main(*args, idf_env: bool = False, expect: int | None = None) -> CliResult:
+    """Run ``cli.main`` in process, cached by arguments, without the ESP-IDF environment unless ``idf_env``."""
+    return _check_exit(_run_main_cached(tuple(str(a) for a in args), idf_env), expect)
+
+
+@functools.cache
+def _run_cli_cached(args: tuple[str, ...], cwd: Path, idf_env: bool) -> CliResult:
+    with _cli_env(idf_env):
+        env = dict(os.environ)
+    p = subprocess.run(
+        [sys.executable, "-m", "esp_riscv_trace", *args],
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+        env=env,
+        check=False,
+    )
+    return CliResult(p.returncode, p.stdout, p.stderr)
+
+
+def run_cli(*args, cwd: Path = ROOT, idf_env: bool = False, expect: int | None = None) -> CliResult:
+    """Run ``python -m esp_riscv_trace`` in a subprocess, cached by cwd, arguments and ``idf_env``."""
+    return _check_exit(_run_cli_cached(tuple(str(a) for a in args), Path(cwd), idf_env), expect)

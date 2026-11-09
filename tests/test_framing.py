@@ -4,8 +4,9 @@
 
 from __future__ import annotations
 
-from helpers import BASE, JALR_X0_RA, NOP, FakeImage, make_buffer, make_frame, make_sync, pack_bits
+from helpers import BASE, JALR_X0_RA, NOP, FakeImage, make_buffer, make_frame, make_note, make_sync, pack_bits
 
+from esp_riscv_trace.analysis.diagnostics import DiagnosticAccumulator
 from esp_riscv_trace.containers.base import TraceBuffer
 from esp_riscv_trace.decoder import reconstruct
 from esp_riscv_trace.decoder.framing import (
@@ -18,6 +19,7 @@ from esp_riscv_trace.decoder.packets_et20 import parse_et20
 from esp_riscv_trace.decoder.params import default_profile
 from esp_riscv_trace.decoder.pipeline import interleave
 from esp_riscv_trace.decoder.ring import linearize
+from esp_riscv_trace.exporters import text as text_exporter
 from esp_riscv_trace.ir.events import (
     InsnClass,
     TraceBoundary,
@@ -171,6 +173,11 @@ def test_circular_wrap_without_anchor_is_warning_not_gap() -> None:
     assert any(isinstance(e, TraceWarning) and e.kind == "no_anchor" for e in events)
     assert not any(isinstance(e, TraceGap) for e in events)
 
+    wrap_line = text_exporter.format_event(next(e for e in events if isinstance(e, TraceBoundary)))
+    warn_line = text_exporter.format_event(next(e for e in events if isinstance(e, TraceWarning)))
+    assert wrap_line.startswith('--- boundary wrap "circular trace memory wraps here"')
+    assert warn_line.startswith('--- warning no_anchor "no anchor found in this physical region"')
+
 
 def test_packet_index_discontinuity_at_wrap_is_real_gap() -> None:
     image = FakeImage(BASE, NOP + JALR_X0_RA + NOP + JALR_X0_RA)
@@ -309,6 +316,8 @@ def test_incomplete_frame_at_stream_end_is_gap() -> None:
     gaps = [e for e in events if isinstance(e, TraceGap)]
     assert len(gaps) == 1
     assert gaps[0].reason == reconstruct.GapReason.PARTIAL_FRAME
+    line = text_exporter.format_event(gaps[0])
+    assert line.startswith("--- gap partial_frame")
 
 
 def test_fifo_overflow_is_trace_lost_gap() -> None:
@@ -327,6 +336,7 @@ def test_fifo_overflow_is_trace_lost_gap() -> None:
 
     gaps = [e for e in events if isinstance(e, TraceGap)]
     assert [g.reason for g in gaps] == [reconstruct.GapReason.TRACE_LOST]
+    assert text_exporter.format_event(gaps[0]).startswith("--- gap trace_lost")
 
 
 def test_trace_disabled_is_execution_gap() -> None:
@@ -343,3 +353,22 @@ def test_trace_disabled_is_execution_gap() -> None:
     gaps = [e for e in events if isinstance(e, TraceGap)]
     assert [g.reason for g in gaps] == [reconstruct.GapReason.TRACE_DISABLED]
     assert any(isinstance(e, TraceSync) for e in events)
+
+
+def test_summary_counts_only_execution_gaps() -> None:
+    image = FakeImage(BASE, NOP + JALR_X0_RA + NOP + JALR_X0_RA)
+    _result, events = _decode_buffer(_continuous_wrapped_buffer(), image)
+    acc = DiagnosticAccumulator()
+    for event in events:
+        acc.push(event)
+    diag = acc.close(make_note())
+    assert diag.gaps == 0
+    assert diag.warnings == 1
+    assert diag.boundaries == 1
+    assert diag.warning_reasons == (("no_anchor", 1),)
+    assert diag.boundary_kinds == (("wrap", 1),)
+
+    lines = text_exporter.format_diagnostic(diag)
+    assert "gaps=0" in lines[0]
+    assert any("warnings=no_anchor=1" in line for line in lines)
+    assert any("boundaries=wrap=1" in line for line in lines)

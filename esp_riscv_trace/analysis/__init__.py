@@ -4,6 +4,11 @@
 
 from __future__ import annotations
 
+from .diagnostics import (
+    DIAG_ROOT_NO_PCS_RECOVERED,
+    DiagnosticAccumulator,
+    TraceDiagnostic,
+)
 from .history import (
     CodeLoop,
     History,
@@ -21,8 +26,10 @@ from .history import (
 from .location import CodeLocation, locate
 
 __all__ = [
+    "DIAG_ROOT_NO_PCS_RECOVERED",
     "CodeLocation",
     "CodeLoop",
+    "DiagnosticAccumulator",
     "History",
     "HistoryBuilder",
     "HistoryEntry",
@@ -30,6 +37,7 @@ __all__ = [
     "HistoryKind",
     "HistoryLoop",
     "StackFrame",
+    "TraceDiagnostic",
     "build_history",
     "cause_name",
     "is_fault",

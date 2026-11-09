@@ -1,0 +1,25 @@
+# esp-riscv-trace decode
+# source            tests/esp32c6/stop.esptrace
+# chip              esp32c6  target_id=0x000d  revision=0x0001
+# core              0  owner=fw
+# packet_format     processor_trace_1_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=2028
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=explicit_stop
+# app_elf_sha256    match  sha=9497e11f522a9a7e  path=tests/built_apps/esp32c6.elf
+# rom_elf           missing-env  path=none
+--- gap alignment_lost "cannot reconstruct 669 bytes before the first verified packet boundary" [frame seg=0 off=0] ---
+--- sync pc=0x40801ef0 priv=1 [frame seg=0 off=876 idx=44569] ---
+--- sync pc=0x40801ef0 priv=1 [frame seg=0 off=1939 idx=44699] ---
+--- gap partial_frame "frame cannot be reconstructed (5 of 8 bytes at physical-region end)" [frame seg=0 off=2063] ---
+--- boundary wrap "circular trace memory wraps here" [frame seg=1 off=2068] ---
+--- sync pc=0x40801ef0 priv=1 [frame seg=1 off=3002 idx=44829] ---
+--- sync pc=0x40801ef0 priv=1 [frame seg=1 off=4065 idx=44959] ---
+--- gap untraced "the encoder stopped tracing before 0x40801eda (qual_status=1)" [frame seg=1 off=4091 idx=44962] ---
+# summary           instructions=49109  syncs=4  traps=0  gaps=3
+#                   top_gap_reasons=alignment_lost=1, partial_frame=1, untraced=1
+#                   boundaries=wrap=1
+# instruction_lines_sha256 071a7224b50bb4ca30699d3987211d46b047a0275d0a7ee48f61aeba6fee4beb

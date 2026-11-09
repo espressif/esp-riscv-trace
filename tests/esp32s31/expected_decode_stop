@@ -1,0 +1,51 @@
+# esp-riscv-trace decode
+# source            tests/esp32s31/stop.esptrace
+# chip              esp32s31  target_id=0x0020  revision=0x0000
+# core              0  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=160
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=explicit_stop
+# app_elf_sha256    match  sha=04a6a7ec10b0c014  path=tests/built_apps/esp32s31.elf
+# rom_elf           missing-env  path=none
+--- gap alignment_lost "cannot reconstruct 651 bytes before the first verified packet boundary" [frame seg=0 off=0] ---
+--- gap walker_not_anchored x3 ["format 1 with address before first sync, cannot anchor" x2, "format 2 before first sync, cannot anchor" x1] [frames seg=0 off=729..1181] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=0 off=1187 idx=43202] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=0 off=2247 idx=43332] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=0 off=3307 idx=43462] ---
+--- gap partial_frame "frame cannot be reconstructed (3 of 8 bytes at physical-region end)" [frame seg=0 off=3933] ---
+--- boundary wrap "circular trace memory wraps here" [frame seg=1 off=3936] ---
+--- warning no_anchor "no anchor found in this physical region" [frame seg=1 off=3936] ---
+# summary           instructions=60257  syncs=3  traps=0  gaps=5
+#                   top_gap_reasons=walker_not_anchored=3, alignment_lost=1, partial_frame=1
+#                   warnings=no_anchor=1
+#                   boundaries=wrap=1
+# esp-riscv-trace decode
+# source            tests/esp32s31/stop.esptrace
+# chip              esp32s31  target_id=0x0020  revision=0x0000
+# core              1  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=4080
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=explicit_stop
+# app_elf_sha256    match  sha=04a6a7ec10b0c014  path=tests/built_apps/esp32s31.elf
+# rom_elf           missing-env  path=none
+--- warning no_anchor "no anchor found in this physical region" [frame seg=0 off=0] ---
+--- boundary wrap "circular trace memory wraps here" [frame seg=1 off=16] ---
+--- gap walker_not_anchored x5 ["format 1 with address before first sync, cannot anchor" x3, "format 2 before first sync, cannot anchor" x2] [frames seg=1 off=16..854] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=1 off=860 idx=64540] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=1 off=1920 idx=64670] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=1 off=2980 idx=64800] ---
+--- sync pc=0x2f00231e priv=3 [frame seg=1 off=4040 idx=64930] ---
+--- gap untraced "the encoder stopped tracing before 0x2f002314 (qual_status=1)" [frame seg=1 off=4086 idx=64936] ---
+# summary           instructions=70611  syncs=4  traps=0  gaps=6
+#                   top_gap_reasons=walker_not_anchored=5, untraced=1
+#                   warnings=no_anchor=1
+#                   boundaries=wrap=1
+# instruction_lines_sha256 b29a1238140f9688f35db343d20ad746034b2e1847561cc779b15269907f487e

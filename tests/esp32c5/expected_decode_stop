@@ -1,0 +1,26 @@
+# esp-riscv-trace decode
+# source            tests/esp32c5/stop.esptrace
+# chip              esp32c5  target_id=0x0017  revision=0x0065
+# core              0  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=832
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=explicit_stop
+# app_elf_sha256    match  sha=e09eeed40648e3d7  path=tests/built_apps/esp32c5.elf
+# rom_elf           missing-env  path=none
+--- gap alignment_lost "cannot reconstruct 555 bytes before the first verified packet boundary" [frame seg=0 off=0] ---
+--- gap walker_not_anchored x3 ["format 1 with address before first sync, cannot anchor" x2, "format 2 before first sync, cannot anchor" x1] [frames seg=0 off=1017..1045] ---
+--- sync pc=0x408023a6 priv=1 [frame seg=0 off=1051 idx=22461] ---
+--- sync pc=0x408023c2 priv=1 [frame seg=0 off=2107 idx=22591] ---
+--- sync pc=0x408023a6 priv=1 [frame seg=0 off=3167 idx=22721] ---
+--- gap partial_frame "frame cannot be reconstructed (5 of 8 bytes at physical-region end)" [frame seg=0 off=3259] ---
+--- boundary wrap "circular trace memory wraps here" [frame seg=1 off=3264] ---
+--- gap walker_not_anchored x16 ["format 1 with address before first sync, cannot anchor" x12, "format 2 before first sync, cannot anchor" x4] [frames seg=1 off=3761..4084] ---
+# summary           instructions=48431  syncs=3  traps=0  gaps=21
+#                   top_gap_reasons=walker_not_anchored=19, alignment_lost=1, partial_frame=1
+#                   boundaries=wrap=1
+#                   repeated_gaps=walker_not_anchored "format 1 with address before first sync, cannot anchor" x2
+# instruction_lines_sha256 f6bedc9f68a6359e247bc2193e49a253497f8aaac48aadfe7c0423d8b768e5a1
