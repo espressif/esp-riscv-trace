@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Iterator
+import functools
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -50,12 +51,16 @@ class UsageError(EspRiscvTraceError):
 class ShaMismatch(EspRiscvTraceError):
     """The ELF SHA-256 differs from the one the capture recorded for a core."""
 
-    def __init__(self, core_id: int, snapshot_sha: bytes | None, elf_sha: bytes | None) -> None:
+    def __init__(
+        self, core_id: int, snapshot_sha: bytes | None, elf_sha: bytes | None, source: Path | None = None
+    ) -> None:
         self.core_id = core_id
         self.snapshot_sha = snapshot_sha
         self.elf_sha = elf_sha
+        where = f" of {source}" if source is not None else ""
         super().__init__(
-            f"ELF SHA-256 mismatch for core {core_id}. snapshot={short_sha(snapshot_sha)} elf={short_sha(elf_sha)}"
+            f"ELF SHA-256 mismatch for core {core_id}{where}. "
+            f"snapshot={short_sha(snapshot_sha)} elf={short_sha(elf_sha)}"
         )
 
 
@@ -119,8 +124,32 @@ def open_session(
 
     Problems that do not stop decoding go to ``warn``, which logs them by default.
     """
-    if not capture.exists():
-        raise FileNotFoundError(f"capture not found: {capture}")
+    with open_sessions(
+        [capture], elf=elf, rom_elf=rom_elf, chip=chip, force_elf=force_elf, require_elf=require_elf, warn=warn
+    ) as sessions:
+        yield sessions[0]
+
+
+@contextlib.contextmanager
+def open_sessions(
+    captures: Sequence[Path],
+    *,
+    elf: Path | None = None,
+    rom_elf: Path | None = None,
+    chip: str | None = None,
+    force_elf: bool = False,
+    require_elf: bool = False,
+    warn: WarnSink = _log_warning,
+) -> Iterator[list[Session]]:
+    """Like ``open_session`` for captures of one chip, which share the ELF files opened once.
+
+    With more than one capture, each warning about a capture ends with its path.
+    """
+    if not captures:
+        raise UsageError("no capture given")
+    for capture in captures:
+        if not capture.exists():
+            raise FileNotFoundError(f"capture not found: {capture}")
     if require_elf and elf is None:
         raise UsageError("--elf is required for this command")
     if elf is not None and not elf.exists():
@@ -128,17 +157,19 @@ def open_session(
     if rom_elf is not None and elf is None:
         raise UsageError("--rom-elf requires --elf")
 
-    cap = containers.load(capture)
-    if cap.fifo_emptied is False:
-        warn("the encoder FIFO did not empty at stop, the end of the trace may be missing")
-    if cap.abi_minor > abi.ABI_MINOR:
-        warn(
-            f"capture uses snapshot ABI {cap.abi_major}.{cap.abi_minor}, this decoder supports "
-            f"{abi.ABI_MAJOR}.{abi.ABI_MINOR}. Newer fields are ignored, update esp-riscv-trace"
-        )
-    chip_name = _resolve_chip(chip, cap, warn)
-    if chip_name is None:
-        raise UsageError("chip is not known. Pass --chip <name> or use a container that records target_id.")
+    caps: list[Capture] = []
+    chip_name: str | None = None
+    for capture in captures:
+        cap_warn = warn if len(captures) == 1 else functools.partial(_warn_about, warn, capture)
+        cap = _load_capture(capture, cap_warn)
+        name = _resolve_chip(chip, cap, cap_warn)
+        if name is None:
+            raise UsageError("chip is not known. Pass --chip <name> or use a container that records target_id.")
+        if chip_name is not None and name != chip_name:
+            raise UsageError(f"{capture} is from {name}, the other captures are from {chip_name}")
+        chip_name = name
+        caps.append(cap)
+    assert chip_name is not None
 
     with contextlib.ExitStack() as stack:
         app: ElfImage | None = None
@@ -150,20 +181,39 @@ def open_session(
             app = stack.enter_context(ElfImage(elf))
             app_resolver = _open_dwarf(app)
             image, resolver = app, app_resolver
-            rom, rom_resolver, rom_path, rom_status = _open_rom_elf(stack, rom_elf, chip_name, cap, warn)
+            rom, rom_resolver, rom_path, rom_status = _open_rom_elf(stack, rom_elf, chip_name, caps[0], warn)
             if rom is not None and rom_resolver is not None:
                 image = LayeredImage(app, rom)
                 resolver = LayeredResolver(app_resolver, rom_resolver)
-        yield Session(
-            cap=cap,
-            chip=chip_name,
-            elf=app,
-            image=image,
-            resolver=resolver,
-            force_elf=force_elf,
-            rom_elf_path=rom_path,
-            rom_elf_status=rom_status,
+        yield [
+            Session(
+                cap=cap,
+                chip=chip_name,
+                elf=app,
+                image=image,
+                resolver=resolver,
+                force_elf=force_elf,
+                rom_elf_path=rom_path,
+                rom_elf_status=rom_status,
+            )
+            for cap in caps
+        ]
+
+
+def _warn_about(warn: WarnSink, capture: Path, message: str) -> None:
+    warn(f"{message} ({capture})")
+
+
+def _load_capture(capture: Path, warn: WarnSink) -> Capture:
+    cap = containers.load(capture)
+    if cap.fifo_emptied is False:
+        warn("the encoder FIFO did not empty at stop, the end of the trace may be missing")
+    if cap.abi_minor > abi.ABI_MINOR:
+        warn(
+            f"capture uses snapshot ABI {cap.abi_major}.{cap.abi_minor}, this decoder supports "
+            f"{abi.ABI_MAJOR}.{abi.ABI_MINOR}. Newer fields are ignored, update esp-riscv-trace"
         )
+    return cap
 
 
 def iter_cores(session: Session, core_filter: int | None) -> Iterator[CoreView]:
@@ -175,7 +225,9 @@ def iter_cores(session: Session, core_filter: int | None) -> Iterator[CoreView]:
         linear = ring.linearize(core)
         note = build_capture_note(session, core, profile, linear)
         if not session.force_elf and note.elf_sha_status == ElfShaStatus.MISMATCH:
-            raise ShaMismatch(core.core_id, note.snapshot_app_elf_sha256, note.elf_sha256)
+            raise ShaMismatch(
+                core.core_id, note.snapshot_app_elf_sha256, note.elf_sha256, source=session.cap.source_path
+            )
         yield CoreView(session=session, core=core, profile=profile, note=note, linear=linear)
 
 
@@ -309,4 +361,5 @@ __all__ = [
     "build_capture_note",
     "iter_cores",
     "open_session",
+    "open_sessions",
 ]

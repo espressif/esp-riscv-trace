@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 
 from ..analysis.diagnostics import TraceDiagnostic
 from ..decoder.framing import PAYLOAD_MAX_LEN
@@ -41,10 +41,7 @@ def format_note(note: TraceCaptureNote, command: str = "decode") -> list[str]:
     lines: list[str] = []
     lines.append(f"# esp-riscv-trace {command}")
     lines.append(f"# source            {one_line(note.source)}")
-    chip = note.chip if note.chip is not None else "unknown"
-    tid = f"0x{note.target_id:04x}" if note.target_id is not None else "none"
-    rev = f"0x{note.chip_revision:04x}" if note.chip_revision is not None else "none"
-    lines.append(f"# chip              {chip}  target_id={tid}  revision={rev}")
+    lines.append(_format_chip_line(note))
     lines.append(f"# core              {note.core_id}  owner={note.owner}")
     lines.append(f"# packet_format     {note.packet_format}  address_mode={note.address_mode}")
     lines.append(f"# memory_mode       {note.memory_mode}  wrap_state={note.wrap_state}")
@@ -68,6 +65,28 @@ def format_note(note: TraceCaptureNote, command: str = "decode") -> list[str]:
     rom_line = _format_rom_elf_line(note)
     if rom_line is not None:
         lines.append(rom_line)
+    return lines
+
+
+def format_capture_set(captures: Sequence[tuple[TraceCaptureNote, TraceDiagnostic]], command: str) -> list[str]:
+    """Return the header for the cores of several captures, one ``(note, diagnostic)`` per core.
+
+    The chip and ELF lines come from the first core. Every core gets one line with its summary counts, plus its ELF
+    check when that differs from the first one.
+    """
+    first = captures[0][0]
+    lines = [f"# esp-riscv-trace {command}", _format_chip_line(first)]
+    lines.append(f"# app_elf_sha256    {_format_sha_status(first)}")
+    rom_line = _format_rom_elf_line(first)
+    if rom_line is not None:
+        lines.append(rom_line)
+    lines.append(f"# captures          {len({note.source for note, _diag in captures})}")
+    for note, diag in captures:
+        sha = f"  elf_sha256={note.elf_sha_status}" if note.elf_sha_status != first.elf_sha_status else ""
+        lines.append(
+            f"#                   {one_line(note.source)}  core={note.core_id}  instructions={diag.instructions}  "
+            f"syncs={diag.syncs}  traps={diag.traps}  gaps={diag.gaps}{sha}"
+        )
     return lines
 
 
@@ -191,6 +210,13 @@ def format_diagnostic(diag: TraceDiagnostic) -> list[str]:
 # ---------------------------------------------------------------------------
 # Internal formatters
 # ---------------------------------------------------------------------------
+
+
+def _format_chip_line(note: TraceCaptureNote) -> str:
+    chip = note.chip if note.chip is not None else "unknown"
+    tid = f"0x{note.target_id:04x}" if note.target_id is not None else "none"
+    rev = f"0x{note.chip_revision:04x}" if note.chip_revision is not None else "none"
+    return f"# chip              {chip}  target_id={tid}  revision={rev}"
 
 
 def _format_sha_status(note: TraceCaptureNote) -> str:
@@ -485,6 +511,7 @@ def _lookup_source(pc: int, resolver: SourceResolver | None) -> str:
 
 __all__ = [
     "GapCoalescer",
+    "format_capture_set",
     "format_diagnostic",
     "format_event",
     "format_note",

@@ -29,7 +29,7 @@ from .exporters import history as history_exporter
 from .exporters import stats_text as stats_exporter
 from .exporters import text as text_exporter
 from .ir.events import TraceEvent, TraceInstruction, TraceTrap
-from .session import CoreView, ShaMismatch, UsageError, iter_cores, open_session
+from .session import CoreView, ShaMismatch, UsageError, iter_cores, open_sessions
 from .snapshot.chip import RISCV_TRACE_CHIPS
 
 EXIT_OK = 0
@@ -53,13 +53,17 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 class _CaptureArgs:
     """The capture argument and the options shared by every subcommand."""
 
-    capture: Path
+    capture: Path | tuple[Path, ...]
     elf: Path | None
     core: int | None
     chip: str | None
     rom_elf: Path | None
     out: Path | None
     quiet: bool
+
+    @property
+    def captures(self) -> tuple[Path, ...]:
+        return self.capture if isinstance(self.capture, tuple) else (self.capture,)
 
 
 # ---------------------------------------------------------------------------
@@ -86,8 +90,20 @@ _PATH = click.Path(path_type=Path)
 
 def _capture_options(command: _F) -> _F:
     """Add the capture argument and the options shared by every subcommand."""
-    options = [
-        click.argument("capture", type=_PATH, help="path to the trace capture file"),
+    return _add_options(command, click.argument("capture", type=_PATH, help="path to the trace capture file"))
+
+
+def _captures_options(command: _F) -> _F:
+    """Like ``_capture_options``, for a command that takes one or more captures."""
+    argument = click.argument(
+        "capture", type=_PATH, nargs=-1, required=True, help="paths to the trace capture files of one app build"
+    )
+    return _add_options(command, argument)
+
+
+def _add_options(command: _F, argument: Callable[[_F], _F]) -> _F:
+    options: list[Callable[[_F], _F]] = [
+        argument,
         click.option("--elf", type=_PATH, default=None, help="application ELF for symbol and DWARF resolution"),
         click.option("--core", type=int, default=None, help="process only this core_id (default is every core)"),
         click.option(
@@ -142,18 +158,25 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 @contextlib.contextmanager
 def _session_views(args: _CaptureArgs, *, require_elf: bool) -> Iterator[list[CoreView]]:
-    """Yield the selected cores, or exit when no core matched."""
-    with open_session(
-        args.capture,
+    """Yield the selected cores of every capture in order, or exit when no core of a capture matched."""
+    with open_sessions(
+        args.captures,
         elf=args.elf,
         rom_elf=args.rom_elf,
         chip=args.chip,
         require_elf=require_elf,
-    ) as session:
-        views = list(iter_cores(session, args.core))
-        if not views:
-            ids = ", ".join(str(c.core_id) for c in session.cap.cores) or "(none)"
-            log.die(f"no core matched --core {args.core}. Present cores {ids}.", exit_code=EXIT_CORE_NOT_FOUND)
+    ) as sessions:
+        views: list[CoreView] = []
+        for session in sessions:
+            selected = list(iter_cores(session, args.core))
+            if not selected:
+                ids = ", ".join(str(c.core_id) for c in session.cap.cores) or "(none)"
+                where = f" in {session.cap.source_path}" if len(sessions) > 1 else ""
+                log.die(
+                    escape(f"no core matched --core {args.core}{where}. Present cores {ids}."),
+                    exit_code=EXIT_CORE_NOT_FOUND,
+                )
+            views.extend(selected)
         yield views
 
 
@@ -268,10 +291,11 @@ def _last_before_fault(sink: TextIO, events: Iterator[TraceEvent], last: int) ->
         "Reconstruct the executed PC stream and aggregate hit counts "
         "by (function, file, line) plus per-observed-block-fragment "
         "entry PC. --elf is required because a stats table without "
-        "symbols is meaningless."
+        "symbols is meaningless. With several captures, for example "
+        "a series of OpenOCD captures, the counts of each core are summed."
     ),
 )
-@_capture_options
+@_captures_options
 @click.option(
     "--top",
     type=click.IntRange(min=0),
@@ -287,10 +311,15 @@ def _last_before_fault(sink: TextIO, events: Iterator[TraceEvent], last: int) ->
 @click.option("--debug", is_flag=True, help="dump each core's raw encoder buffer after the snapshot header")
 def _cmd_stats(top: int, per_block: bool, merge_cores: bool, debug: bool, **capture: Any) -> int:
     args = _CaptureArgs(**capture)
+    if debug and len(args.captures) > 1:
+        raise UsageError("--debug takes one capture")
     with _session_views(args, require_elf=True) as views:
         per_core = [_collect_stats(view) for view in views]
         with _out_sink(args.out) as sink:
-            _render_stats(sink, per_core, top=top, per_block=per_block, merge_cores=merge_cores, debug=debug)
+            if len(args.captures) > 1:
+                _render_stats_of_captures(sink, per_core, top=top, per_block=per_block, merge_cores=merge_cores)
+            else:
+                _render_stats(sink, per_core, top=top, per_block=per_block, merge_cores=merge_cores, debug=debug)
     if not args.quiet:
         _print_summary(views, [diag for _view, _snap, diag in per_core])
     return EXIT_OK
@@ -334,6 +363,33 @@ def _render_stats(
         label = f"core={view.core.core_id}"
         _write_lines(sink, stats_exporter.format_stats(snapshot, top=top, per_block=per_block, label=label))
         _write_lines(sink, text_exporter.format_diagnostic(diag))
+
+
+def _render_stats_of_captures(
+    sink: TextIO,
+    per_core: Sequence[_CoreStats],
+    *,
+    top: int,
+    per_block: bool,
+    merge_cores: bool,
+) -> None:
+    """Write one header for all captures, then the tables summed per core, or over every core."""
+    _write_lines(sink, text_exporter.format_capture_set([(view.note, diag) for view, _snap, diag in per_core], "stats"))
+    by_core: dict[int, list[StatsSnapshot]] = {}
+    for view, snap, _diag in per_core:
+        by_core.setdefault(view.core.core_id, []).append(snap)
+    captures = len({view.session.cap.source_path for view, _snap, _diag in per_core})
+    if merge_cores:
+        merged = StatsSnapshot.merge(snap for _view, snap, _diag in per_core)
+        label = f"cores={','.join(str(core_id) for core_id in sorted(by_core))}  captures={captures}"
+        _write_lines(sink, stats_exporter.format_stats(merged, top=top, per_block=per_block, label=label))
+        return
+    for core_id in sorted(by_core):
+        snaps = by_core[core_id]
+        label = f"core={core_id}  captures={len(snaps)}"
+        _write_lines(
+            sink, stats_exporter.format_stats(StatsSnapshot.merge(snaps), top=top, per_block=per_block, label=label)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -453,9 +509,11 @@ def _out_sink(path: Path | None) -> Iterator[TextIO]:
 def _print_summary(views: Sequence[CoreView], diags: Sequence[TraceDiagnostic]) -> None:
     session = views[0].session
     cap: Capture = session.cap
-    ids = ",".join(str(v.core.core_id) for v in views)
+    captures = len({v.session.cap.source_path for v in views})
+    source = cap.source_path if captures == 1 else f"{captures} captures"
+    ids = ",".join(str(core_id) for core_id in dict.fromkeys(v.core.core_id for v in views))
     summary = (
-        f"esp-riscv-trace: {cap.source_path} chip={session.chip} cores=[{ids}] "
+        f"esp-riscv-trace: {source} chip={session.chip} cores=[{ids}] "
         f"instructions={sum(d.instructions for d in diags)} syncs={sum(d.syncs for d in diags)} "
         f"traps={sum(d.traps for d in diags)} gaps={sum(d.gaps for d in diags)}"
     )

@@ -52,6 +52,31 @@ esp riscv_trace start loop trace.esptrace 500    # stop by itself after 500 ms
 After a panic, the firmware stops the trace before the debugger halts, and `esp riscv_trace stop` writes it.
 `esp riscv_trace dump <file>` writes buffers that are already stopped.
 
+One capture holds only the last few milliseconds before it stopped. For a profile of a running application, take
+many captures and sum them with `stats`. Save this OpenOCD procedure as `sample.tcl`. It waits a random 0.5 to 1.5
+times `interval_ms` between captures, so periodic work does not line up with them:
+
+```tcl
+proc riscv_trace_sample {prefix count {interval_ms 100}} {
+    for {set i 0} {$i < $count} {incr i} {
+        esp riscv_trace start loop [format "%s_%04d.esptrace" $prefix $i]
+        sleep [expr {int($interval_ms * (0.5 + rand()))}]
+        esp riscv_trace stop
+    }
+}
+```
+
+The application must not start the trace at boot. Reset the target and let it boot before the first capture:
+
+```bash
+openocd -f board/esp32s31-builtin.cfg -f sample.tcl \
+    -c "init; reset run; sleep 2000; riscv_trace_sample s 100; shutdown"   # s_0000.esptrace to s_0099.esptrace
+esp-riscv-trace stats s_*.esptrace --elf build/app.elf
+```
+
+The counts are retired instructions, not time. The trace has no timestamps, so cache misses, wait states and idle
+time do not show.
+
 From a core dump: with core dump enabled, the trace starts at boot by default and the core dump stores the buffers.
 Pass the core dump ELF (for example from `esp-coredump info_corefile -s coredump.elf ...`) to this tool.
 
@@ -73,7 +98,7 @@ ESP-IDF environment.
 
 ```
 esp-riscv-trace decode  <capture> [options]
-esp-riscv-trace stats   <capture> --elf PATH [options]
+esp-riscv-trace stats   <capture>... --elf PATH [options]
 esp-riscv-trace history <capture> --elf PATH [options]
 ```
 
@@ -107,7 +132,10 @@ A fault is an exception other than `ecall`. With `--last`, the summary still cov
 | `--top N` | Number of rows in the table (default 20) |
 | `--per-block` | Add per-function block entry tables |
 | `--merge-cores` | Combine all cores into one table |
-| `--debug` | Hex-dump each core's raw encoder buffer after its header |
+| `--debug` | Hex-dump each core's raw encoder buffer after its header. Takes one capture |
+
+`stats` takes several captures of the same app build. It then writes one header with a summary line for every capture
+and core, and one table per core with the counts of every capture summed.
 
 `history` adds:
 
