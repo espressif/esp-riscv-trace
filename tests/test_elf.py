@@ -11,6 +11,7 @@ from unittest import mock
 import pytest
 from helpers import FakeImage, FakeResolver
 
+from esp_riscv_trace.analysis.history import build_history
 from esp_riscv_trace.elf import CodeReadError, rom
 from esp_riscv_trace.elf.dwarf import SourceLocation
 from esp_riscv_trace.elf.image import ElfImage, _fill_zero_sizes
@@ -19,11 +20,15 @@ from esp_riscv_trace.elf.rom import (
     RomStatus,
     resolve_rom_elf,
 )
+from esp_riscv_trace.exporters.history import format_history
+from esp_riscv_trace.ir.events import TraceEvent, TraceSync, TraceTrap
 
 _ROM_ENV = {"IDF_PATH": "/opt/esp/idf", "ESP_ROM_ELF_DIR": "/opt/esp/roms"}
 
 _STT_NOTYPE = 0
+_STT_OBJECT = 1
 _STT_FUNC = 2
+_FETCH_FAULT = 1
 _TEXT = 1
 _SHN_ABS = 0xFFF1
 _CODE = 0x1000
@@ -182,6 +187,21 @@ def test_absolute_symbols_name_only_their_address(tmp_path) -> None:
         assert image.symbol_at(0x2120) == "Cache_Suspend"
         # An absolute label in the code of the ELF marks a section bound, not a function
         assert image.symbol_at(_CODE + 0x80) is None
+
+
+def test_history_names_the_variable_code_ran_in(tmp_path) -> None:
+    """A jump into a buffer of copied code, as execute_dram_buffer() does, faults in the variable."""
+    elf = _write_elf(tmp_path / "app.elf", [("s_code", _CODE + 0x40, 0x40, _STT_OBJECT, _TEXT)])
+    fault = _CODE + 0x48
+    events: list[TraceEvent] = [
+        TraceSync(pc=_CODE, privilege=3, provenance=None),
+        TraceTrap(_FETCH_FAULT, False, None, None, tval=fault, provenance=None, epc=fault),
+    ]
+    with ElfImage(elf) as image:
+        assert (image.data_at(_CODE + 0x40), image.data_at(_CODE + 0x80)) == ("s_code", None)
+        assert format_history(build_history(events, image), image, None, label="core 0")[1] == (
+            "# fault             instruction access fault in s_code+8 (data)  epc=0x00001048  tval=0x00001048"
+        )
 
 
 @pytest.mark.parametrize(
