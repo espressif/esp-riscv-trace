@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
-"""Shared builders and paths for the tests."""
+"""Shared fakes, builders and paths for the tests."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import dataclasses
 import struct
 from pathlib import Path
 
+from esp_riscv_trace.elf import CodeReadError
+from esp_riscv_trace.elf.dwarf import SourceLocation
 from esp_riscv_trace.snapshot import abi
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -16,6 +18,37 @@ APPS = TESTS / "built_apps"
 
 C5_STOP = TESTS / "esp32c5" / "stop.esptrace"
 C5_ELF = APPS / "esp32c5.elf"
+
+
+class FakeImage:
+    """Code image backed by one byte range and an optional symbol table."""
+
+    def __init__(
+        self, base: int = 0, data: bytes = b"", symbols: dict[int, str] | None = None, *, name: str = "image"
+    ) -> None:
+        self._base = base
+        self._data = data
+        self._symbols = dict(symbols or {})
+        self._name = name
+
+    def read(self, vaddr: int, size: int) -> bytes:
+        off = vaddr - self._base
+        if off < 0 or off + size > len(self._data):
+            raise CodeReadError(f"{self._name} 0x{vaddr:08x} out of range")
+        return self._data[off : off + size]
+
+    def symbol_at(self, vaddr: int) -> str | None:
+        return self._symbols.get(vaddr)
+
+
+class FakeResolver:
+    """Source resolver backed by a PC to location dict."""
+
+    def __init__(self, locs: dict[int, SourceLocation] | None = None) -> None:
+        self._locs = dict(locs or {})
+
+    def resolve(self, pc: int) -> SourceLocation | None:
+        return self._locs.get(pc)
 
 
 def pack_struct(fmt: str, defaults: dict[str, object], overrides: dict[str, object]) -> bytes:
