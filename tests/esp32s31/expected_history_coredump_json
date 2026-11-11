@@ -1,0 +1,351 @@
+{
+  "command": "history",
+  "cores": [
+    {
+      "core": 0,
+      "chip": "esp32s31",
+      "source": "tests/esp32s31/coredump.elf",
+      "elf_sha256_status": "match",
+      "summary": {
+        "instructions": 2066,
+        "syncs": 9,
+        "traps": 1,
+        "gaps": 173
+      },
+      "history": {
+        "omitted": 233,
+        "instructions": 1909,
+        "fault": {
+          "kind": "fault",
+          "depth": 2,
+          "segment": 0,
+          "instructions": 0,
+          "pc": "0x2f0071dc",
+          "target": "0x2f000000",
+          "site": {
+            "function": "panic_abort",
+            "file": "/IDF/components/esp_system/panic.c",
+            "line": 508
+          },
+          "dest": {
+            "function": "_vector_table",
+            "file": "/IDF/components/riscv/vectors_clic.S",
+            "line": 56
+          },
+          "cause": 2,
+          "cause_name": "illegal instruction",
+          "tval": "0x00000000",
+          "detail": null
+        },
+        "items": [
+          {
+            "kind": "call",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 0,
+            "pc": "0x2f0068fa",
+            "target": null,
+            "site": {
+              "function": "abort",
+              "file": "/IDF/components/esp_libc/src/abort.c",
+              "line": 27
+            },
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "return",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 6,
+            "pc": null,
+            "target": "0x2f0068fe",
+            "site": null,
+            "dest": {
+              "function": "abort",
+              "file": "/IDF/components/riscv/include/riscv/rv_utils.h",
+              "line": 97
+            },
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "call",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 0,
+            "pc": "0x2f00690c",
+            "target": null,
+            "site": {
+              "function": "abort",
+              "file": "/IDF/components/esp_libc/src/abort.c",
+              "line": 28
+            },
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "return",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 17,
+            "pc": null,
+            "target": "0x2f006910",
+            "site": null,
+            "dest": {
+              "function": "abort",
+              "file": "/IDF/components/esp_libc/src/abort.c",
+              "line": 30
+            },
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "loop",
+            "count": 4,
+            "instructions": 36,
+            "body": [
+              {
+                "kind": "call",
+                "depth": 0,
+                "segment": 0,
+                "instructions": 0,
+                "pc": "0x2f006944",
+                "target": null,
+                "site": {
+                  "function": "abort",
+                  "file": "/IDF/components/esp_libc/src/abort.c",
+                  "line": 35
+                },
+                "dest": null,
+                "cause": null,
+                "cause_name": null,
+                "tval": null,
+                "detail": null
+              },
+              {
+                "kind": "return",
+                "depth": 0,
+                "segment": 0,
+                "instructions": 6,
+                "pc": null,
+                "target": "0x2f006948",
+                "site": null,
+                "dest": {
+                  "function": "abort",
+                  "file": "/IDF/components/esp_libc/src/abort.c",
+                  "line": 34
+                },
+                "cause": null,
+                "cause_name": null,
+                "tval": null,
+                "detail": null
+              }
+            ]
+          },
+          {
+            "kind": "call",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 2,
+            "pc": "0x2f006932",
+            "target": "0x2f007198",
+            "site": {
+              "function": "abort",
+              "file": "/IDF/components/esp_libc/src/abort.c",
+              "line": 38
+            },
+            "dest": {
+              "function": "esp_system_abort",
+              "file": "/IDF/components/esp_system/port/esp_system_chip.c",
+              "line": 87
+            },
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "call",
+            "depth": 1,
+            "segment": 0,
+            "instructions": 5,
+            "pc": "0x2f00719a",
+            "target": "0x2f0071ca",
+            "site": {
+              "function": "esp_system_abort",
+              "file": "/IDF/components/esp_system/port/esp_system_chip.c",
+              "line": 88
+            },
+            "dest": {
+              "function": "panic_abort",
+              "file": "/IDF/components/esp_system/panic.c",
+              "line": 502
+            },
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "fault",
+            "depth": 2,
+            "segment": 0,
+            "instructions": 0,
+            "pc": "0x2f0071dc",
+            "target": "0x2f000000",
+            "site": {
+              "function": "panic_abort",
+              "file": "/IDF/components/esp_system/panic.c",
+              "line": 508
+            },
+            "dest": {
+              "function": "_vector_table",
+              "file": "/IDF/components/riscv/vectors_clic.S",
+              "line": 56
+            },
+            "cause": 2,
+            "cause_name": "illegal instruction",
+            "tval": "0x00000000",
+            "detail": null
+          }
+        ]
+      }
+    },
+    {
+      "core": 1,
+      "chip": "esp32s31",
+      "source": "tests/esp32s31/coredump.elf",
+      "elf_sha256_status": "match",
+      "summary": {
+        "instructions": 14933,
+        "syncs": 2,
+        "traps": 0,
+        "gaps": 13
+      },
+      "history": {
+        "omitted": 0,
+        "instructions": 14933,
+        "fault": null,
+        "items": [
+          {
+            "kind": "gap",
+            "depth": 0,
+            "segment": -1,
+            "instructions": 0,
+            "pc": null,
+            "target": null,
+            "site": null,
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": "alignment_lost"
+          },
+          {
+            "kind": "gap",
+            "depth": 0,
+            "segment": -1,
+            "instructions": 0,
+            "pc": null,
+            "target": null,
+            "site": null,
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": "walker_not_anchored"
+          },
+          {
+            "kind": "start",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 7631,
+            "pc": null,
+            "target": "0x2f00231e",
+            "site": null,
+            "dest": {
+              "function": "branchy_work",
+              "file": "/IDF_PROJECT/main/test_app_main.c",
+              "line": 32
+            },
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "gap",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 0,
+            "pc": null,
+            "target": null,
+            "site": null,
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": "partial_frame"
+          },
+          {
+            "kind": "gap",
+            "depth": 0,
+            "segment": 0,
+            "instructions": 0,
+            "pc": null,
+            "target": null,
+            "site": null,
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": "walker_not_anchored"
+          },
+          {
+            "kind": "start",
+            "depth": 0,
+            "segment": 1,
+            "instructions": 7302,
+            "pc": null,
+            "target": "0x2f00231e",
+            "site": null,
+            "dest": {
+              "function": "branchy_work",
+              "file": "/IDF_PROJECT/main/test_app_main.c",
+              "line": 32
+            },
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": null
+          },
+          {
+            "kind": "gap",
+            "depth": 0,
+            "segment": 1,
+            "instructions": 0,
+            "pc": null,
+            "target": null,
+            "site": null,
+            "dest": null,
+            "cause": null,
+            "cause_name": null,
+            "tval": null,
+            "detail": "untraced"
+          }
+        ]
+      }
+    }
+  ]
+}

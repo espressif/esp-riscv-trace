@@ -1,0 +1,44 @@
+# esp-riscv-trace stats
+# chip              esp32s31  target_id=0x0020  revision=0x0000
+# app_elf_sha256    match  sha=04a6a7ec10b0c014  path=tests/built_apps/esp32s31.elf
+# rom_elf           missing-env  path=none
+# captures          2
+#                   tests/esp32s31/stop.esptrace  core=0  instructions=60257  syncs=3  traps=0  gaps=5
+#                   tests/esp32s31/stop.esptrace  core=1  instructions=70611  syncs=4  traps=0  gaps=6
+#                   tests/esp32s31/panic_stop.esptrace  core=0  instructions=4148  syncs=18  traps=1  gaps=69
+#                   tests/esp32s31/panic_stop.esptrace  core=1  instructions=53839  syncs=3  traps=0  gaps=8
+# stats             core=0  captures=2  instructions=64405  denominator=64405  top=20
+#    pct  count  function                          file:line
+   46.76  30115  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:31
+   23.36  15047  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:32
+   17.52  11286  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:35
+    5.84   3759  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:33
+    0.18    114  esp_cpu_compare_and_set()         /IDF/components/riscv/include/riscv/rv_utils.h:520
+    0.17    108  getc()                            <unresolved>
+    0.14     90  __bufio_get()                     <unresolved>
+    0.14     90  xPortEnterCriticalTimeout()       /IDF/components/esp_hw_support/include/spinlock.h:197
+    0.14     90  xPortEnterCriticalTimeout()       /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:563
+    0.13     86  xPortSetInterruptMaskFromISR()    /IDF/components/riscv/include/esp_private/interrupt_clic.h:176
+    0.13     85  xTaskGetSchedulerState()          /IDF/components/freertos/FreeRTOS-Kernel/tasks.c:5029
+    0.11     72  vPortExitCriticalMultiCore()      /IDF/components/esp_hw_support/include/spinlock.h:281
+    0.11     72  vPortExitCriticalMultiCore()      /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:588
+    0.10     64  getc_unlocked()                   <unresolved>
+    0.08     54  vPortExitCriticalMultiCore()      /IDF/components/esp_hw_support/include/spinlock.h:91
+    0.08     54  vPortExitCriticalMultiCore()      /IDF/components/esp_hw_support/include/spinlock.h:278
+    0.08     54  vPortExitCriticalMultiCore()      /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:575
+    0.08     54  xPortEnterCriticalTimeout()       /IDF/components/esp_hw_support/include/spinlock.h:91
+    0.08     54  xPortEnterCriticalTimeout()       /IDF/components/esp_hw_support/include/spinlock.h:216
+    0.08     54  xPortEnterCriticalTimeout()       /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:539
+#                   unresolved_pcs=line=305
+# stats             core=1  captures=2  instructions=124450  denominator=124450  top=20
+#    pct  count  function                          file:line
+   49.98  62196  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:31
+   24.97  31077  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:32
+   18.73  23310  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:35
+    6.24   7767  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:33
+    0.02     20  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:30
+    0.02     20  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:38
+    0.02     20  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:39
+    0.02     20  workload_task()                   /IDF_PROJECT/main/test_app_main.c:45
+    0.01     10  branchy_work()                    /IDF_PROJECT/main/test_app_main.c:29
+    0.01     10  workload_task()                   /IDF_PROJECT/main/test_app_main.c:44

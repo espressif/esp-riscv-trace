@@ -1,0 +1,55 @@
+# esp-riscv-trace history
+# source            tests/esp32c6/coredump.elf
+# chip              esp32c6  target_id=0x000d  revision=0x0001
+# core              0  owner=fw
+# packet_format     processor_trace_1_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=608
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=panic
+# app_elf_sha256    match  sha=9497e11f522a9a7e  path=tests/built_apps/esp32c6.elf
+# rom_elf           missing-env  path=none
+# history           core=0  items=37  omitted=0  instructions=43364
+# fault             illegal instruction in panic_abort  epc=0x4080561a  tval=0x4080561a
+#         pc    insns  outline                                                                   source
+                  0  -- gap alignment_lost
+0x40801ef0      100    start in branchy_work                                                   /IDF_PROJECT/main/test_app_main.c:32
+              42943  loop x4 {
+0x42009a78        3    } branchy_work                                                          /IDF_PROJECT/main/test_app_main.c:44
+0x42009a74     6895    branchy_work() {                                                        /IDF_PROJECT/main/test_app_main.c:45
+                     }
+0x40801eec        1    interrupt 9 in branchy_work {                                           /IDF_PROJECT/main/test_app_main.c:31
+0x40800024       36      ~> _interrupt_handler                                                 /IDF/components/riscv/vectors_intc.S:63
+0x40800224       30      rtos_int_enter()                                                      /IDF/components/riscv/vectors.S:516
+0x4080026c        5      _global_interrupt_handler() {                                         /IDF/components/riscv/vectors.S:571
+0x4080674e       10        intr_get_item()                                                     /IDF/components/riscv/interrupt.c:65
+0x40806756       14        SysTickIsrHandler() {                                               /IDF/components/riscv/interrupt.c:67
+0x40805bba        0          systimer_hal_get_counter_value() {                                /IDF/components/freertos/port_systick.c:140
+                  0            -- gap pc_out_of_image
+                  0            -- gap partial_frame
+0x40805a5e       12                  start in vPortEnterCritical                               /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:657
+0x4201227c        9                } vPortEnterCritical                                        /IDF/components/freertos/FreeRTOS-Kernel/queue.c:956
+0x420121da       15                prvCopyDataToQueue() {                                      /IDF/components/freertos/FreeRTOS-Kernel/queue.c:964
+0x40805d26       22                  xTaskPriorityDisinherit()                                 /IDF/components/freertos/FreeRTOS-Kernel/queue.c:2469
+0x420121de        7                } prvCopyDataToQueue                                        /IDF/components/freertos/FreeRTOS-Kernel/queue.c:966
+0x420121f8       17                vPortExitCritical() {                                       /IDF/components/freertos/FreeRTOS-Kernel/queue.c:1056
+0x40805adc        6                  vPortClearInterruptMaskFromISR()                          /IDF/components/freertos/FreeRTOS-Kernel/portable/riscv/port.c:683
+0x420121fc        8                } vPortExitCritical                                         /IDF/components/freertos/FreeRTOS-Kernel/queue.c:1057
+0x420123dc        8              } xQueueGenericSend                                           /IDF/components/freertos/FreeRTOS-Kernel/queue.c:789
+0x40801c94        6            } xQueueGiveMutexRecursive                                      /IDF/components/esp_libc/src/locks.c:209
+0x40801d6a        3          } lock_release_generic                                            /IDF/components/esp_libc/src/locks.c:224
+0x40801e9a        3        } _lock_release_recursive                                           /IDF/components/esp_libc/src/locks.c:360
+0x4200f534        6      } __retarget_lock_release_recursive
+0x42009aa8       17    } getc                                                                  /IDF_PROJECT/main/test_app_main.c:60
+0x42009ba8        5  } read_command                                                            /IDF_PROJECT/main/test_app_main.c:101
+0x42009bb6       23  strcmp()                                                                  /IDF_PROJECT/main/test_app_main.c:101
+0x42009b76       14  abort() {                                                                 /IDF_PROJECT/main/test_app_main.c:102
+0x40804eba        0    memset() {                                                              /IDF/components/esp_libc/src/abort.c:25
+                  0      -- gap pc_out_of_image
+0x4080561a        0  !! illegal instruction in panic_abort  epc=0x4080561a  tval=0x4080561a    /IDF/components/esp_system/panic.c:508
+# summary           instructions=43512  syncs=3  traps=2  gaps=5
+#                   top_gap_reasons=pc_out_of_image=2, alignment_lost=1, partial_frame=1
+#                   warnings=no_anchor=1
+#                   boundaries=wrap=1

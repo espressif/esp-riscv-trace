@@ -1,0 +1,28 @@
+# esp-riscv-trace decode
+# source            tests/esp32c6/panic_stop.esptrace
+# chip              esp32c6  target_id=0x000d  revision=0x0001
+# core              0  owner=fw
+# packet_format     processor_trace_1_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=3964
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=panic
+# app_elf_sha256    match  sha=9497e11f522a9a7e  path=tests/built_apps/esp32c6.elf
+# rom_elf           missing-env  path=none
+--- warning no_anchor "no anchor found in this physical region" [frame seg=0 off=0] ---
+--- gap framing_error "cannot establish packet alignment in physical region" [frame seg=0 off=0] ---
+--- boundary wrap "circular trace memory wraps here" [frame seg=1 off=132] ---
+--- sync pc=0x40022e06 priv=1 [frame seg=1 off=1257 idx=44316] ---
+--- gap pc_out_of_image "pc=0x40022e06: vaddr 0x40022e06+2 below first executable segment" ---
+--- sync pc=0x420121cc priv=1 [frame seg=1 off=2402 idx=44446] ---
+--- sync pc=0x4200f52c priv=1 [frame seg=1 off=3543 idx=44576] ---
+--- gap pc_out_of_image "pc=0x400004a8: vaddr 0x400004a8+2 below first executable segment" ---
+--- trap cause=2 async=0 handler=0x40800000 epc=0x4080561a tval=0x4080561a [frame seg=1 off=4007 idx=44629] ---
+--- gap untraced "the encoder stopped tracing before 0x42008880 (qual_status=1)" [frame seg=1 off=4089 idx=44638] ---
+# summary           instructions=1951  syncs=3  traps=1  gaps=4
+#                   top_gap_reasons=pc_out_of_image=2, framing_error=1, untraced=1
+#                   warnings=no_anchor=1
+#                   boundaries=wrap=1
+# instruction_lines_sha256 8b415c912f2f31ac4839949b23361862c537d8dd63a3dbf30d216367bc2a7604

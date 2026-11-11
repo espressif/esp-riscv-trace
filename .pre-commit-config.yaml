@@ -35,8 +35,11 @@ repos:
     rev: v2.4.1
     hooks:
       - id: mypy
-        files: ^esp_riscv_trace/
-        additional_dependencies: []
+        files: ^(esp_riscv_trace|tests)/
+        additional_dependencies:
+          - esp-pylib[cli]>=1.2.1
+          - pyelftools>=0.29
+          - pytest
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.4.3

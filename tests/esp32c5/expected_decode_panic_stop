@@ -1,0 +1,73 @@
+# esp-riscv-trace decode
+# source            tests/esp32c5/panic_stop.esptrace
+# chip              esp32c5  target_id=0x0017  revision=0x0065
+# core              0  owner=fw
+# packet_format     efficient_trace_2_0  address_mode=delta
+# memory_mode       loop  wrap_state=inferred_wrapped
+# resync            mode=packet  threshold=128
+#                   wrap_reason=nonzero_tail
+# buffer            capacity=4096  head_offset=2048
+# hw_status         fifo=0x00000001  intr=0x00000000  empty=yes  full=no  overflow=no
+# capture           reason=panic
+# app_elf_sha256    match  sha=e09eeed40648e3d7  path=tests/built_apps/esp32c5.elf
+# rom_elf           missing-env  path=none
+--- gap alignment_lost "cannot reconstruct 188 bytes before the first verified packet boundary" [frame seg=0 off=0] ---
+--- gap walker_not_anchored "format 1 with address before first sync, cannot anchor" [frame seg=0 off=322 idx=27024] ---
+--- sync pc=0x408023bc priv=1 [frame seg=0 off=328 idx=27025] ---
+--- trap cause=21 async=1 handler=0x408001dc epc=0x408023b4 tval=none [frame seg=0 off=917 idx=27098] ---
+--- gap untraced "the jump at 0x4080746e leaves the traced range (qual_status=1)" [frame seg=0 off=951 idx=27103] ---
+--- sync pc=0x40807472 priv=1 [frame seg=0 off=956 idx=27104] ---
+--- gap untraced "the jump at 0x40807480 leaves the traced range (qual_status=1)" [frame seg=0 off=969 idx=27106] ---
+--- sync pc=0x40807484 priv=1 [frame seg=0 off=974 idx=27107] ---
+--- gap untraced "the jump at 0x40800ac4 leaves the traced range (qual_status=1)" [frame seg=0 off=994 idx=27110] ---
+--- sync pc=0x40800ac8 priv=1 [frame seg=0 off=999 idx=27111] ---
+--- gap untraced "the jump at 0x40800ad6 leaves the traced range (qual_status=1)" [frame seg=0 off=1012 idx=27113] ---
+--- sync pc=0x40800ada priv=1 [frame seg=0 off=1017 idx=27114] ---
+--- gap untraced "the jump at 0x40800ae8 leaves the traced range (qual_status=1)" [frame seg=0 off=1030 idx=27116] ---
+--- sync pc=0x40800aec priv=1 [frame seg=0 off=1035 idx=27117] ---
+--- gap untraced "the jump at 0x40800af4 leaves the traced range (qual_status=1)" [frame seg=0 off=1048 idx=27119] ---
+--- sync pc=0x40800af8 priv=1 [frame seg=0 off=1053 idx=27120] ---
+--- gap untraced "the jump at 0x40800b00 leaves the traced range (qual_status=1)" [frame seg=0 off=1066 idx=27122] ---
+--- sync pc=0x40800b04 priv=1 [frame seg=0 off=1071 idx=27123] ---
+--- gap untraced "the jump at 0x408079f0 leaves the traced range (qual_status=1)" [frame seg=0 off=1147 idx=27135] ---
+--- sync pc=0x408079f4 priv=1 [frame seg=0 off=1152 idx=27136] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1717 idx=27210] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1722 idx=27211] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1736 idx=27213] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1741 idx=27214] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1755 idx=27216] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1760 idx=27217] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1774 idx=27219] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1779 idx=27220] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1793 idx=27222] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1798 idx=27223] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1812 idx=27225] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1817 idx=27226] ---
+--- gap untraced "the jump at 0x4200a842 leaves the traced range (qual_status=1)" [frame seg=0 off=1831 idx=27228] ---
+--- sync pc=0x4200a846 priv=1 [frame seg=0 off=1836 idx=27229] ---
+--- gap partial_frame "frame cannot be reconstructed (1 of 6 bytes at physical-region end)" [frame seg=0 off=2047] ---
+--- boundary wrap "circular trace memory wraps here" [frame seg=1 off=2048] ---
+--- gap walker_not_anchored x94 ["format 1 with address before first sync, cannot anchor" x70, "format 2 before first sync, cannot anchor" x24] [frames seg=1 off=2122..2821 idx=27265..27358] ---
+--- sync pc=0x40807318 priv=1 [frame seg=1 off=2827 idx=27359] ---
+--- sync pc=0x4200fac4 priv=1 [frame seg=1 off=3813 idx=27489] ---
+--- gap untraced "the jump at 0x40805ae2 leaves the traced range (qual_status=1)" [frame seg=1 off=3864 idx=27496] ---
+--- sync pc=0x40805ae6 priv=1 [frame seg=1 off=3869 idx=27497] ---
+--- gap untraced "the jump at 0x40805af4 leaves the traced range (qual_status=1)" [frame seg=1 off=3882 idx=27499] ---
+--- sync pc=0x40805af8 priv=1 [frame seg=1 off=3887 idx=27500] ---
+--- gap untraced "the jump at 0x40805b04 leaves the traced range (qual_status=1)" [frame seg=1 off=3900 idx=27502] ---
+--- sync pc=0x40805b08 priv=1 [frame seg=1 off=3905 idx=27503] ---
+--- gap untraced "the jump at 0x40805b3e leaves the traced range (qual_status=1)" [frame seg=1 off=3919 idx=27505] ---
+--- sync pc=0x40805b42 priv=1 [frame seg=1 off=3924 idx=27506] ---
+--- gap untraced "the jump at 0x40805b3e leaves the traced range (qual_status=1)" [frame seg=1 off=3938 idx=27508] ---
+--- sync pc=0x40805b42 priv=1 [frame seg=1 off=3943 idx=27509] ---
+--- gap untraced "the jump at 0x40805b3e leaves the traced range (qual_status=1)" [frame seg=1 off=3957 idx=27511] ---
+--- sync pc=0x40805b42 priv=1 [frame seg=1 off=3962 idx=27512] ---
+--- gap untraced "the jump at 0x40805b3e leaves the traced range (qual_status=1)" [frame seg=1 off=3976 idx=27514] ---
+--- sync pc=0x40805b42 priv=1 [frame seg=1 off=3981 idx=27515] ---
+--- trap cause=2 async=0 handler=0x40800000 epc=0x40806e94 tval=0x00000000 [frame seg=1 off=3996 idx=27517] ---
+--- gap untraced "the encoder stopped tracing before 0x4200891e (qual_status=1)" [frame seg=1 off=4080 idx=27526] ---
+# summary           instructions=16482  syncs=25  traps=2  gaps=120
+#                   top_gap_reasons=walker_not_anchored=95, untraced=23, alignment_lost=1
+#                   boundaries=wrap=1
+#                   repeated_gaps=walker_not_anchored "format 1 with address before first sync, cannot anchor" x2
+# instruction_lines_sha256 b6f2eaa534ba6a6615c711aa1a0a38e9f395b45854c9547a6de217115c94af7f
