@@ -19,7 +19,9 @@ from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
+from ..decoder.encoding import MASK32
 from ..decoder.reconstruct import GapReason
+from ..decoder.semantics import decode_at
 from ..elf import CodeImage
 from ..ir.events import InsnClass, LinkKind, TraceEvent, TraceGap, TraceInstruction, TraceSync, TraceTrap
 
@@ -93,8 +95,14 @@ class HistoryKind(StrEnum):
     GAP = "gap"
 
 
-# Entries that move control by a jump, whose target is None when it leaves the traced range
+# Entries that move control by a jump. When it leaves the traced range, the target is None, or inferred for a call.
 _JUMP_KINDS = frozenset({HistoryKind.CALL, HistoryKind.RETURN, HistoryKind.TAIL_CALL, HistoryKind.TRAP_RETURN})
+
+# Instructions that set the base register of a jalr, with whether the value is relative to their own address
+_UPPER_IMMEDIATES = {"auipc": True, "lui": False}
+
+# The auipc or lui and the jalr of a call the history names are 32-bit instructions
+_PAIR_INSN_LENGTH = 4
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,8 @@ class HistoryEntry:
     tval: int | None = None  # mtval of ECALL and FAULT
     detail: str = ""  # gap reason, or why a return does not match the shadow stack
     interrupt: bool = False  # FAULT: the trap is an interrupt that ends the history
+    # CALL into code outside the traced range. The code of the call gives the target the trace does not report.
+    target_inferred: bool = False
 
 
 @dataclass(frozen=True)
@@ -230,8 +240,9 @@ class HistoryBuilder:
     """Streams trace events of one core into a ``History``.
 
     ``image`` names the function of a jump and its target, which tells a tail call from a jump inside a
-    function. Without it, jumps that do not call or return are not recorded. An interrupt whose mcause
-    exception code is in ``end_interrupts`` ends the history like a fault.
+    function. Without it, jumps that do not call or return are not recorded. Its code also gives the callee of a call
+    into code outside the traced range, when an auipc or lui and the jalr of the call make the address. An interrupt
+    whose mcause exception code is in ``end_interrupts`` ends the history like a fault.
     """
 
     def __init__(self, image: CodeImage | None = None, *, end_interrupts: Collection[int] = ()) -> None:
@@ -258,6 +269,8 @@ class HistoryBuilder:
         # pc, depth and segment of the newest instructions; None where a trap or a loss of trace came between them
         self._recent: deque[tuple[int, int, int] | None] = deque(maxlen=_LOOP_LOOKBACK)
         self._since_loss = 0  # instructions since the trace started or last lost trace
+        # The newest instruction, None after a sync, a trap or a gap
+        self._previous: TraceInstruction | None = None
 
     @property
     def done(self) -> bool:
@@ -276,15 +289,19 @@ class HistoryBuilder:
             self._pending_instructions += 1
             self._follow_loop(event)
             self._on_instruction(event)
+            self._previous = event
         elif isinstance(event, TraceSync):
+            self._previous = None
             if self._untraced:
                 self._reenter(event.pc)
             elif not self._running:
                 self._start(event.pc)
         elif isinstance(event, TraceTrap):
+            self._previous = None
             self._untraced = False
             self._on_trap(event)
         elif isinstance(event, TraceGap):
+            self._previous = None
             if event.reason == GapReason.UNTRACED and self._running:
                 self._on_untraced()
             else:
@@ -327,7 +344,11 @@ class HistoryBuilder:
                 handler = next((f for f in reversed(self._stack) if f.trap), None)
                 if handler is not None:
                     handler.scheduled = True
-            self._open(HistoryKind.CALL, insn.pc, insn.next_pc, self._depth)
+            target, inferred = insn.next_pc, False
+            if target is None:
+                target = self._untraced_call_target(insn)
+                inferred = target is not None
+            self._open(HistoryKind.CALL, insn.pc, target, self._depth, target_inferred=inferred)
             self._push_frame(_Frame(self._depth, (insn.pc + insn.length,), trap=False, pc=insn.pc))
             self._depth += 1
         elif link == LinkKind.RETURN:
@@ -477,7 +498,7 @@ class HistoryBuilder:
         pending = self._pending
         left_by_jump = (
             pending is not None
-            and pending.target is None
+            and (pending.target is None or pending.target_inferred)
             and pending.kind in _JUMP_KINDS
             and self._pending_instructions == 0
         )
@@ -564,6 +585,25 @@ class HistoryBuilder:
         self._loop = None
         self._recent.append(None)
 
+    def _untraced_call_target(self, call: TraceInstruction) -> int | None:
+        """Where a call into untraced code goes, from the auipc or lui that retired right before its jalr."""
+        image, previous = self._image, self._previous
+        if image is None or previous is None or call.length != _PAIR_INSN_LENGTH:
+            return None
+        start = call.pc - _PAIR_INSN_LENGTH
+        if previous.pc != start or previous.length != _PAIR_INSN_LENGTH or previous.next_pc != call.pc:
+            return None
+        high, jalr = decode_at(image, start), decode_at(image, call.pc)
+        if high is None or jalr is None:
+            return None
+        relative = _UPPER_IMMEDIATES.get(high.mnemonic)
+        if relative is None or jalr.mnemonic != "jalr" or not high.rd or high.rd != jalr.rs1:
+            return None
+        assert high.imm is not None and jalr.imm is not None
+        base = start if relative else 0
+        # jalr clears bit 0 of the target
+        return (base + high.imm + jalr.imm) & MASK32 & ~1
+
     def _runs_scheduler(self, target: int | None) -> bool:
         return self._image is not None and target is not None and self._symbol(target) in _SCHEDULER_FUNCTIONS
 
@@ -591,6 +631,7 @@ class HistoryBuilder:
         tval: int | None = None,
         detail: str = "",
         interrupt: bool = False,
+        target_inferred: bool = False,
     ) -> None:
         """Finish the pending entry and start counting instructions for a new one."""
         self._finish_pending()
@@ -605,6 +646,7 @@ class HistoryBuilder:
             tval=tval,
             detail=detail,
             interrupt=interrupt,
+            target_inferred=target_inferred,
         )
         self._pending_instructions = 0
 
@@ -675,7 +717,7 @@ def build_history(
 
 def _entry_key(entry: HistoryEntry) -> tuple[object, ...]:
     """What makes two entries the same step of a loop. Instruction counts and segments may differ."""
-    return (entry.kind, entry.pc, entry.target, entry.depth, entry.cause, entry.detail)
+    return (entry.kind, entry.pc, entry.target, entry.target_inferred, entry.depth, entry.cause, entry.detail)
 
 
 def _instructions(items: Iterable[HistoryItem]) -> int:

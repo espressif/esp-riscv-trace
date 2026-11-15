@@ -28,6 +28,7 @@ _OUTLINE_WIDTH = 72
 _UNTRACED = "<untraced>"
 _UNKNOWN = "?"
 _DATA = " (data)"
+_INFERRED = " (untraced)"
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,7 @@ def history_to_dict(history: History, image: CodeImage | None, resolver: SourceR
             "instructions": e.instructions,
             "pc": _hex(e.pc),
             "target": _hex(e.target),
+            "target_inferred": e.target_inferred,
             "site": location(e.pc),
             "dest": location(e.target),
             "cause": e.cause,
@@ -122,7 +124,7 @@ def _outline(items: Sequence[HistoryItem], image: CodeImage | None, *, extra: in
         after = items[i + 1] if i + 1 < len(items) else None
         if it.kind == HistoryKind.CALL and _returns_at_once(it, after):
             pc = it.pc if it.pc is not None else it.target
-            yield _Line(pc, it.instructions, it.depth + extra, _callee(it.target, image))
+            yield _Line(pc, it.instructions, it.depth + extra, _callee(it, image))
             i += 2
             continue
         pc, text = _describe(it, image)
@@ -146,7 +148,7 @@ def _describe(e: HistoryEntry, image: CodeImage | None) -> tuple[int | None, str
     if kind == HistoryKind.START:
         return e.target, f"start in {_function(e.target, image)}"
     if kind == HistoryKind.CALL:
-        return (e.pc if e.pc is not None else e.target), f"{_callee(e.target, image)} {{"
+        return (e.pc if e.pc is not None else e.target), f"{_callee(e, image)} {{"
     if kind == HistoryKind.RETURN:
         text = f"}} {_function(e.pc, image)}"
         pc = e.target if e.target is not None else e.pc
@@ -206,10 +208,14 @@ def _function(pc: int | None, image: CodeImage | None) -> str:
     return variable + _DATA if variable else _UNKNOWN
 
 
-def _callee(pc: int | None, image: CodeImage | None) -> str:
-    """Where a call goes, as ``foo()``, or as the variable when it goes into data."""
-    name = _function(pc, image)
-    return name if name.endswith(_DATA) else f"{name}()"
+def _callee(call: HistoryEntry, image: CodeImage | None) -> str:
+    """Where a call goes, as ``foo()``, or as the variable when it goes into data.
+
+    ``foo() (untraced)`` is a callee outside the traced range.
+    """
+    name = _function(call.target, image)
+    text = name if name.endswith(_DATA) else f"{name}()"
+    return text + _INFERRED if call.target_inferred else text
 
 
 def _hex(value: int | None) -> str | None:

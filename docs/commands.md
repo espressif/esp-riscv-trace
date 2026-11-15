@@ -110,9 +110,9 @@ then a `sync` where the core comes back into traced code:
 
 `history` prints the calls, returns, interrupts and context switches per core up to the first fault. Each row shows
 the PC whose source line it names, the instructions retired until the next row, and the outline. A call that returns
-before anything else happens is one row, `<untraced>` is code the encoder did not trace, and repeated passes of the
-same rows show once as `loop xN`. The end of `esp-riscv-trace history tests/esp32c5/coredump.elf --elf
-tests/built_apps/esp32c5.elf`:
+before anything else happens is one row, and repeated passes of the same rows show once as `loop xN`. `<untraced>` is
+code the encoder did not trace. `f() (untraced)` is a call into such code that the `auipc` or `lui` before its `jalr`
+names. The end of `esp-riscv-trace history tests/esp32c5/coredump.elf --elf tests/built_apps/esp32c5.elf`:
 
 ```text
 # history           core=0  items=40  omitted=496  instructions=4617
@@ -123,11 +123,11 @@ tests/built_apps/esp32c5.elf`:
 0x42009cec        5  } read_command                                                            /IDF_PROJECT/main/test_app_main.c:101
 0x42009cfa       23  strcmp()                                                                  /IDF_PROJECT/main/test_app_main.c:101
 0x42009cba       14  abort() {                                                                 /IDF_PROJECT/main/test_app_main.c:102
-0x40805ae2        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:25
-0x40805af4        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:27
-0x40805b04        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:28
+0x40805ae2        0    memset() (untraced)                                                     /IDF/components/esp_libc/src/abort.c:25
+0x40805af4        0    itoa() (untraced)                                                       /IDF/components/esp_libc/src/abort.c:27
+0x40805b04        0    itoa() (untraced)                                                       /IDF/components/esp_libc/src/abort.c:28
                  39    loop x4 {
-0x40805b3e        0      <untraced>()                                                          /IDF/components/esp_libc/src/abort.c:35
+0x40805b3e        0      strcat() (untraced)                                                   /IDF/components/esp_libc/src/abort.c:35
                        }
 0x40805b2a        3    esp_system_abort() {                                                    /IDF/components/esp_libc/src/abort.c:38
 0x40806e50        5      panic_abort() {                                                       /IDF/components/esp_system/port/esp_system_chip.c:88

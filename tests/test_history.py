@@ -4,8 +4,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import replace
+
 import pytest
-from helpers import BAR, FOO, IMAGE, ISR, MAIN, SCHEDULER, TASK_B, Trace
+from helpers import BAR, FOO, IMAGE, ISR, MAIN, SCHEDULER, TASK_B, FakeImage, Trace
 
 from esp_riscv_trace.analysis.history import (
     CodeLoop,
@@ -13,12 +16,21 @@ from esp_riscv_trace.analysis.history import (
     HistoryEntry,
     HistoryKind,
     HistoryLoop,
+    _entry_key,
 )
+from esp_riscv_trace.decoder.encoding import RA
 from esp_riscv_trace.decoder.reconstruct import GapReason
-from esp_riscv_trace.exporters.history import format_history
+from esp_riscv_trace.exporters.history import format_history, history_to_dict
+from esp_riscv_trace.ir.events import TraceInstruction
 
 _STORE_ACCESS_FAULT = 7
 _TIMER_IRQ = 7
+
+_T1 = 6
+# A call into ROM in reconfigure_ticks of the esp32c5 fixture app: auipc ra,0xff800 and jalr -1808(ra)
+_SITE = 0x40800AC0
+_ROM_CALLEE = 0x400003B0
+_CALLBACK = _SITE + 0x100
 
 
 def _outline(history: History) -> list[tuple[HistoryKind, int, int | None, int | None]]:
@@ -34,6 +46,40 @@ def _entry(item: object) -> HistoryEntry:
 def _loop(item: object) -> HistoryLoop:
     assert isinstance(item, HistoryLoop)
     return item
+
+
+def _auipc(rd: int, imm: int) -> int:
+    return (imm << 12) | (rd << 7) | 0x17
+
+
+def _lui(rd: int, imm: int) -> int:
+    return (imm << 12) | (rd << 7) | 0x37
+
+
+def _addi(rd: int, rs1: int, imm: int) -> int:
+    return ((imm & 0xFFF) << 20) | (rs1 << 15) | (rd << 7) | 0x13
+
+
+def _jalr(rd: int, rs1: int, imm: int) -> int:
+    return ((imm & 0xFFF) << 20) | (rs1 << 15) | (rd << 7) | 0x67
+
+
+def _code(*words: int, base: int = _SITE) -> FakeImage:
+    """Code of ``words`` from ``base``, where ``_ROM_CALLEE`` is named."""
+    data = b"".join(word.to_bytes(4, "little") for word in words)
+    return FakeImage(base, data, {_ROM_CALLEE: "wdt_hal_write_protect_disable"})
+
+
+_ROM_CALL = (_auipc(RA, 0xFF800), _jalr(RA, RA, -1808))
+
+
+def _untraced_call() -> Trace:
+    """The instruction at ``_SITE``, then the call after it into untraced code, which returns."""
+    return Trace().sync(_SITE).run(_SITE).call(_SITE + 4, None).gap(GapReason.UNTRACED).sync(_SITE + 8).run(_SITE + 8)
+
+
+def _call(history: History) -> HistoryEntry:
+    return next(e for e in history.entries() if e.kind == HistoryKind.CALL)
 
 
 def test_calls_and_returns_nest_at_the_caller_depth() -> None:
@@ -265,6 +311,152 @@ def test_untraced_code_that_calls_into_the_trace_is_a_call() -> None:
         (HistoryKind.CALL, 1, None, FOO),
         (HistoryKind.RETURN, 1, FOO + 4, None),
     ]
+
+
+@pytest.mark.parametrize(
+    ("high", "jalr", "target"),
+    [
+        # The sum wraps past 2^32
+        (_auipc(RA, 0xFF800), _jalr(RA, RA, -1808), _ROM_CALLEE),
+        # jalr clears bit 0
+        (_lui(_T1, 0x40001), _jalr(RA, _T1, -15), 0x40000FF0),
+    ],
+    ids=["auipc", "lui"],
+)
+def test_call_into_untraced_code_gets_its_target_from_the_code(high: int, jalr: int, target: int) -> None:
+    trace = _untraced_call()
+    history = trace.history(image=_code(high, jalr))
+
+    assert _outline(history) == [
+        (HistoryKind.START, 0, None, _SITE),
+        (HistoryKind.CALL, 0, _SITE + 4, target),
+        (HistoryKind.RETURN, 0, None, _SITE + 8),
+    ]
+    assert [e.target_inferred for e in history.entries()] == [False, True, False]
+    assert history.instructions == 3
+    # The event still has no target, as the trace reported it
+    call_event = trace.events[2]
+    assert isinstance(call_event, TraceInstruction) and call_event.next_pc is None
+
+
+@pytest.mark.parametrize(
+    ("high", "jalr"),
+    [
+        (_auipc(_T1, 0xFF800), _jalr(RA, RA, -1808)),
+        (_lui(0, 0x40000), _jalr(RA, 0, 0)),
+        (_addi(RA, RA, 4), _jalr(RA, RA, 0)),
+        # An encoding wider than 32 bits
+        (0x3F, _jalr(RA, RA, 0)),
+    ],
+    ids=["register_mismatch", "zero_register", "not_upper_immediate", "wide_encoding"],
+)
+def test_call_into_untraced_code_keeps_no_target_for_other_code(high: int, jalr: int) -> None:
+    history = _untraced_call().history(image=_code(high, jalr))
+
+    assert _outline(history) == [
+        (HistoryKind.START, 0, None, _SITE),
+        (HistoryKind.CALL, 0, _SITE + 4, None),
+        (HistoryKind.RETURN, 0, None, _SITE + 8),
+    ]
+    assert not any(e.target_inferred for e in history.entries())
+
+
+@pytest.mark.parametrize(
+    "image",
+    [None, _code(_ROM_CALL[1], base=_SITE + 4), _code(_ROM_CALL[0])],
+    ids=["no_image", "before_the_call", "the_call"],
+)
+def test_call_into_untraced_code_keeps_no_target_for_unreadable_code(image: FakeImage | None) -> None:
+    call = _call(_untraced_call().history(image=image))
+    assert (call.pc, call.target, call.target_inferred) == (_SITE + 4, None, False)
+
+
+@pytest.mark.parametrize(
+    "before",
+    [
+        lambda: Trace().sync(_SITE + 4),
+        lambda: Trace().sync(_SITE + 12).jump(_SITE + 12, _SITE + 4),
+        lambda: Trace().sync(_SITE).run(_SITE).gap().sync(_SITE + 4),
+        lambda: (
+            Trace()
+            .sync(_SITE)
+            .run(_SITE)
+            .trap(_TIMER_IRQ, epc=_SITE + 4, interrupt=True)
+            .run(ISR)
+            .mret(ISR + 4, _SITE + 4)
+        ),
+    ],
+    ids=["trace_starts_at_the_call", "reached_by_a_jump", "after_lost_trace", "after_a_trap"],
+)
+def test_call_into_untraced_code_needs_the_instruction_before_it_to_run_first(before: Callable[[], Trace]) -> None:
+    """The code before the call sets the register, but the trace does not show that it ran right before the call."""
+    trace = before().call(_SITE + 4, None).gap(GapReason.UNTRACED).sync(_SITE + 8).run(_SITE + 8)
+    call = _call(trace.history(image=_code(*_ROM_CALL, 0x13)))
+    assert (call.pc, call.target, call.target_inferred) == (_SITE + 4, None, False)
+
+
+def test_untraced_callee_with_a_target_calls_back_into_the_trace() -> None:
+    trace = (
+        Trace()
+        .sync(_SITE)
+        .run(_SITE)
+        .call(_SITE + 4, None)
+        .gap(GapReason.UNTRACED)
+        .sync(_CALLBACK)
+        .run(_CALLBACK)
+        .ret(_CALLBACK + 4, None)
+        .gap(GapReason.UNTRACED)
+        .sync(_SITE + 8)
+        .run(_SITE + 8)
+    )
+    image = _code(*_ROM_CALL)
+    history = trace.history(image=image)
+
+    assert _outline(history) == [
+        (HistoryKind.START, 0, None, _SITE),
+        (HistoryKind.CALL, 0, _SITE + 4, _ROM_CALLEE),
+        (HistoryKind.CALL, 1, None, _CALLBACK),
+        (HistoryKind.RETURN, 1, _CALLBACK + 4, None),
+        (HistoryKind.RETURN, 0, None, _SITE + 8),
+    ]
+    assert format_history(history, image, None, label="core 0")[3].endswith(
+        "wdt_hal_write_protect_disable() (untraced) {"
+    )
+
+
+def test_traced_call_keeps_the_target_the_trace_reports() -> None:
+    trace = Trace().sync(_SITE).run(_SITE).call(_SITE + 4, FOO).run(FOO).ret(FOO + 4, _SITE + 8)
+    call = _call(trace.history(image=_code(*_ROM_CALL)))
+    assert (call.target, call.target_inferred) == (FOO, False)
+
+
+def test_loop_passes_fold_only_with_the_same_target_provenance() -> None:
+    trace = Trace().sync(_SITE)
+    for _ in range(4):
+        trace.run(_SITE).call(_SITE + 4, None).gap(GapReason.UNTRACED).sync(_SITE + 8).jump(_SITE + 8, _SITE)
+    history = trace.history(image=_code(*_ROM_CALL))
+
+    loop = _loop(history.items[1])
+    assert loop.count == 4
+    call = _entry(loop.body[0])
+    assert (call.kind, call.target, call.target_inferred) == (HistoryKind.CALL, _ROM_CALLEE, True)
+    # A pass whose trace reports the same target is another step
+    assert _entry_key(call) != _entry_key(replace(call, target_inferred=False))
+
+
+def test_inferred_target_shows_in_text_and_json() -> None:
+    image = _code(*_ROM_CALL)
+    history = _untraced_call().history(image=image)
+
+    lines = format_history(history, image, None, label="core 0")
+    assert lines[3].endswith("  wdt_hal_write_protect_disable() (untraced)")
+    items = history_to_dict(history, image, None)["items"]
+    assert [(i["kind"], i["target"], i["target_inferred"]) for i in items] == [
+        ("start", "0x40800ac0", False),
+        ("call", "0x400003b0", True),
+        ("return", "0x40800ac8", False),
+    ]
+    assert items[1]["dest"] == {"function": "wdt_hal_write_protect_disable", "file": None, "line": None}
 
 
 def test_fault_ends_the_history() -> None:

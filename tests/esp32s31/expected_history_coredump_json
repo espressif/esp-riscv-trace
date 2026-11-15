@@ -22,6 +22,7 @@
           "instructions": 0,
           "pc": "0x2f0071dc",
           "target": "0x2f000000",
+          "target_inferred": false,
           "site": {
             "function": "panic_abort",
             "file": "/IDF/components/esp_system/panic.c",
@@ -44,13 +45,18 @@
             "segment": 0,
             "instructions": 0,
             "pc": "0x2f0068fa",
-            "target": null,
+            "target": "0x2f80059c",
+            "target_inferred": true,
             "site": {
               "function": "abort",
               "file": "/IDF/components/esp_libc/src/abort.c",
               "line": 27
             },
-            "dest": null,
+            "dest": {
+              "function": "itoa",
+              "file": null,
+              "line": null
+            },
             "cause": null,
             "cause_name": null,
             "tval": null,
@@ -63,6 +69,7 @@
             "instructions": 6,
             "pc": null,
             "target": "0x2f0068fe",
+            "target_inferred": false,
             "site": null,
             "dest": {
               "function": "abort",
@@ -80,13 +87,18 @@
             "segment": 0,
             "instructions": 0,
             "pc": "0x2f00690c",
-            "target": null,
+            "target": "0x2f80059c",
+            "target_inferred": true,
             "site": {
               "function": "abort",
               "file": "/IDF/components/esp_libc/src/abort.c",
               "line": 28
             },
-            "dest": null,
+            "dest": {
+              "function": "itoa",
+              "file": null,
+              "line": null
+            },
             "cause": null,
             "cause_name": null,
             "tval": null,
@@ -99,6 +111,7 @@
             "instructions": 17,
             "pc": null,
             "target": "0x2f006910",
+            "target_inferred": false,
             "site": null,
             "dest": {
               "function": "abort",
@@ -121,13 +134,18 @@
                 "segment": 0,
                 "instructions": 0,
                 "pc": "0x2f006944",
-                "target": null,
+                "target": "0x2f800540",
+                "target_inferred": true,
                 "site": {
                   "function": "abort",
                   "file": "/IDF/components/esp_libc/src/abort.c",
                   "line": 35
                 },
-                "dest": null,
+                "dest": {
+                  "function": "strcat",
+                  "file": null,
+                  "line": null
+                },
                 "cause": null,
                 "cause_name": null,
                 "tval": null,
@@ -140,6 +158,7 @@
                 "instructions": 6,
                 "pc": null,
                 "target": "0x2f006948",
+                "target_inferred": false,
                 "site": null,
                 "dest": {
                   "function": "abort",
@@ -160,6 +179,7 @@
             "instructions": 2,
             "pc": "0x2f006932",
             "target": "0x2f007198",
+            "target_inferred": false,
             "site": {
               "function": "abort",
               "file": "/IDF/components/esp_libc/src/abort.c",
@@ -182,6 +202,7 @@
             "instructions": 5,
             "pc": "0x2f00719a",
             "target": "0x2f0071ca",
+            "target_inferred": false,
             "site": {
               "function": "esp_system_abort",
               "file": "/IDF/components/esp_system/port/esp_system_chip.c",
@@ -204,6 +225,7 @@
             "instructions": 0,
             "pc": "0x2f0071dc",
             "target": "0x2f000000",
+            "target_inferred": false,
             "site": {
               "function": "panic_abort",
               "file": "/IDF/components/esp_system/panic.c",
@@ -245,6 +267,7 @@
             "instructions": 0,
             "pc": null,
             "target": null,
+            "target_inferred": false,
             "site": null,
             "dest": null,
             "cause": null,
@@ -259,6 +282,7 @@
             "instructions": 0,
             "pc": null,
             "target": null,
+            "target_inferred": false,
             "site": null,
             "dest": null,
             "cause": null,
@@ -273,6 +297,7 @@
             "instructions": 7631,
             "pc": null,
             "target": "0x2f00231e",
+            "target_inferred": false,
             "site": null,
             "dest": {
               "function": "branchy_work",
@@ -291,6 +316,7 @@
             "instructions": 0,
             "pc": null,
             "target": null,
+            "target_inferred": false,
             "site": null,
             "dest": null,
             "cause": null,
@@ -305,6 +331,7 @@
             "instructions": 0,
             "pc": null,
             "target": null,
+            "target_inferred": false,
             "site": null,
             "dest": null,
             "cause": null,
@@ -319,6 +346,7 @@
             "instructions": 7302,
             "pc": null,
             "target": "0x2f00231e",
+            "target_inferred": false,
             "site": null,
             "dest": {
               "function": "branchy_work",
@@ -337,6 +365,7 @@
             "instructions": 0,
             "pc": null,
             "target": null,
+            "target_inferred": false,
             "site": null,
             "dest": null,
             "cause": null,
