@@ -4,7 +4,8 @@
 
 Decodes RISC-V hardware instruction trace captured on Espressif chips.
 ``open_capture`` is the entry point for Python callers. ``parse_note`` and ``format_note`` read and describe the
-trace note of a core dump alone.
+trace note of a core dump alone. ``FaultWindowBuilder`` keeps the events before a fault for the walks of
+``analysis.origin``.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from .analysis.history import (
     is_fault,
 )
 from .analysis.location import CodeLocation
+from .analysis.origin import FaultWindow, FaultWindowBuilder
 from .api import TraceCapture, TraceCore, open_capture
 from .decoder.reconstruct import GapReason
 from .exporters.note import format_note
@@ -64,6 +66,8 @@ __all__ = [
     "CodeLocation",
     "CodeLoop",
     "ElfShaStatus",
+    "FaultWindow",
+    "FaultWindowBuilder",
     "GapReason",
     "History",
     "HistoryBuilder",

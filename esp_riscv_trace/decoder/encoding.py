@@ -12,11 +12,16 @@ XLEN_BYTES = 4
 
 RA = 1
 SP = 2
+GP = 3
+TP = 4
 T0 = 5
 A0 = 10
 A1 = 11
 # s0 to s11
 S_REGS = (8, 9, *range(18, 28))
+
+# ecall has no compressed form
+ECALL_LENGTH = 4
 
 # Bits 1..0 of the first parcel, which are 0b11 for a 32-bit instruction
 QUADRANT_MASK = 0x3
@@ -151,6 +156,8 @@ def zcm_mnemonic(insn: int) -> str | None:
 __all__ = [
     "A0",
     "A1",
+    "ECALL_LENGTH",
+    "GP",
     "MASK32",
     "OPCODE_AMO",
     "OPCODE_AUIPC",
@@ -179,6 +186,7 @@ __all__ = [
     "SP",
     "S_REGS",
     "T0",
+    "TP",
     "XLEN_BYTES",
     "ZCMP_RLIST_MIN",
     "ZCMT_JALT_MIN",

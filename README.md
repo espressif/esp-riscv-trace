@@ -7,8 +7,8 @@ program flow, resolves each PC to a function and source line through the app ELF
 table, the call history that led to a crash, or call stacks for a flame graph. Lost instruction continuity is reported
 as a gap.
 
-It is a command-line tool. Other tools, such as `esp-coredump`, read captures through the [Python API][api]. The
-other modules are internal and have no stable API.
+It is a command-line tool. Other tools, such as `esp-coredump`, read captures and walk back from the fault of a crash
+through the [Python API][api]. The modules it does not describe are internal and have no stable API.
 
 ## Supported chips
 

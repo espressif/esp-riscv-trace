@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+import importlib
+from dataclasses import fields
+
 import pytest
 from elftools.elf.elffile import ELFFile
 from elftools.elf.segments import NoteSegment
@@ -20,6 +23,22 @@ from esp_riscv_trace import (
     format_note,
     open_capture,
     parse_note,
+)
+from esp_riscv_trace.analysis.origin import (
+    BUS_ERROR_INSTRUCTIONS,
+    MAX_BRANCHES,
+    MAX_STEPS,
+    MAX_STORE_EVENTS,
+    MAX_VALUE_DEPTH,
+    WINDOW_EVENTS,
+    BranchOutcome,
+    BusAccess,
+    Crossing,
+    RegisterStep,
+    Relation,
+    StackCall,
+    StepKind,
+    StopReason,
 )
 from esp_riscv_trace.elf.image import ElfImage
 
@@ -148,3 +167,122 @@ def test_format_note_describes_the_note_without_decoding() -> None:
         "  buffer 0x2f0105bc, capacity 0x1000, head 0x850, segment 18",
         "  hw fifo 0x00000001, intr 0x00000000, empty yes, full no, overflow no",
     ]
+
+
+# The names esp-coredump imports, by module. Moving one out of __all__ breaks it.
+CONSUMER_IMPORTS = {
+    "esp_riscv_trace": (
+        "AbiError",
+        "CaptureReason",
+        "ElfShaStatus",
+        "FaultWindow",
+        "FaultWindowBuilder",
+        "GapReason",
+        "HistoryBuilder",
+        "HistoryKind",
+        "HistoryLoop",
+        "InsnClass",
+        "LinkKind",
+        "State",
+        "TraceGap",
+        "TraceInstruction",
+        "TraceSync",
+        "TraceTrap",
+        "compare_elf_sha",
+        "format_note",
+        "open_capture",
+        "parse_note",
+    ),
+    "esp_riscv_trace.analysis.origin": ("MAX_STEPS", "WINDOW_EVENTS", "RegisterStep", "StepKind"),
+    "esp_riscv_trace.elf": ("CodeReadError",),
+}
+
+# Result types, enums and protocols docs/api.md documents, which a caller uses without importing them.
+DOCUMENTED_TYPES = {
+    "esp_riscv_trace": ("HistoryEntry",),
+    "esp_riscv_trace.analysis.origin": (
+        "BranchOutcome",
+        "BusAccess",
+        "Crossing",
+        "Relation",
+        "StackCall",
+        "StopReason",
+    ),
+    "esp_riscv_trace.elf": ("CodeImage",),
+}
+
+
+@pytest.mark.parametrize("module", CONSUMER_IMPORTS)
+def test_names_esp_coredump_imports_are_public(module: str) -> None:
+    public = importlib.import_module(module).__all__
+    assert [name for name in CONSUMER_IMPORTS[module] if name not in public] == []
+
+
+@pytest.mark.parametrize("module", DOCUMENTED_TYPES)
+def test_documented_types_are_public(module: str) -> None:
+    public = importlib.import_module(module).__all__
+    assert [name for name in DOCUMENTED_TYPES[module] if name not in public] == []
+
+
+def test_walk_results_have_the_documented_fields_names_and_limits() -> None:
+    """esp-coredump reads these fields, maps these names to its report, and its text describes these limits."""
+    assert {
+        "reg",
+        "kind",
+        "value",
+        "pc",
+        "instruction",
+        "use_pc",
+        "address",
+        "store_pc",
+        "store_instruction",
+        "relation",
+        "sources",
+        "crossed",
+        "stop",
+        "stop_pc",
+        "detail",
+    } <= {f.name for f in fields(RegisterStep)}
+    assert [f.name for f in fields(BusAccess)] == ["pc", "instruction", "index"]
+    assert [f.name for f in fields(StackCall)] == ["pc", "sp"]
+    assert [f.name for f in fields(BranchOutcome)] == ["pc", "taken"]
+    assert list(StepKind) == ["set", "copied", "computed", "loaded", "linked", "read", "written", "pointer", "unknown"]
+    assert list(StopReason) == [
+        "trace_start",
+        "window",
+        "trace_lost",
+        "untraced",
+        "context_switch",
+        "scheduler",
+        "syscall",
+        "unsupported",
+        "unreadable",
+        "steps",
+    ]
+    assert list(Crossing) == [
+        "interrupt",
+        "exception",
+        "syscall",
+        "untraced_call",
+        "trap_entry",
+        "trace_warning",
+        "unchecked_value",
+    ]
+    assert list(Relation) == ["callee", "caller"]
+    assert (WINDOW_EVENTS, MAX_STEPS, MAX_VALUE_DEPTH, MAX_STORE_EVENTS, BUS_ERROR_INSTRUCTIONS, MAX_BRANCHES) == (
+        32768,
+        8,
+        32,
+        4096,
+        8,
+        4,
+    )
+    limits = {
+        "WINDOW_EVENTS",
+        "MAX_STEPS",
+        "MAX_VALUE_DEPTH",
+        "MAX_STORE_EVENTS",
+        "BUS_ERROR_INSTRUCTIONS",
+        "MAX_BRANCHES",
+    }
+    assert limits <= set(importlib.import_module("esp_riscv_trace.analysis.origin").__all__)
