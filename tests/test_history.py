@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import pytest
 from helpers import BAR, FOO, IMAGE, ISR, MAIN, SCHEDULER, TASK_B, Trace
 
 from esp_riscv_trace.analysis.history import (
@@ -285,3 +286,50 @@ def test_fault_ends_the_history() -> None:
     assert (fault.cause, fault.tval) == (_STORE_ACCESS_FAULT, 0)
     # The handler after the fault is not part of the history
     assert history.instructions == 2
+
+
+@pytest.mark.parametrize(
+    ("trace", "instructions", "since_loss"),
+    [
+        (Trace().sync(MAIN).run(MAIN, 5), 5, 5),
+        (Trace().sync(MAIN).run(MAIN, 3).gap(GapReason.TRACE_LOST).sync(FOO).run(FOO, 2), 5, 2),
+        (Trace().sync(MAIN).run(MAIN, 3).gap().sync(FOO).run(FOO, 2), 5, 2),
+        (
+            Trace()
+            .sync(MAIN)
+            .run(MAIN, 2)
+            .call(MAIN + 8, None)
+            .gap(GapReason.UNTRACED)
+            .sync(MAIN + 12)
+            .run(MAIN + 12, 3),
+            6,
+            6,
+        ),
+        (Trace().sync(MAIN).run(MAIN, 3).gap().gap(GapReason.TRACE_LOST).sync(FOO).run(FOO), 4, 1),
+        (Trace().sync(MAIN).run(MAIN, 3).gap(), 3, 0),
+        (Trace().gap(GapReason.UNTRACED).sync(MAIN).run(MAIN, 2), 2, 2),
+    ],
+    ids=["start", "trace_lost", "packet_gap", "untraced_call", "repeated_gaps", "gap_at_end", "untraced_first"],
+)
+def test_since_loss_counts_from_the_last_lost_trace(trace: Trace, instructions: int, since_loss: int) -> None:
+    history = trace.history()
+    assert (history.instructions, history.since_loss) == (instructions, since_loss)
+
+
+def test_since_loss_stops_where_the_history_ends() -> None:
+    watchdog = 40
+    fault = (
+        Trace()
+        .sync(MAIN)
+        .run(MAIN, 3)
+        .gap()
+        .sync(FOO)
+        .run(FOO, 2)
+        .trap(_STORE_ACCESS_FAULT, epc=FOO + 8, tval=0)
+        .run(ISR, 10)
+    )
+    assert (fault.history().instructions, fault.history().since_loss) == (5, 2)
+    interrupted = Trace().sync(MAIN).run(MAIN, 2).trap(watchdog, epc=MAIN + 8, interrupt=True).run(ISR, 4)
+    assert interrupted.history(end_interrupts=(watchdog,)).since_loss == 2
+    # An interrupt that does not end the history loses no trace
+    assert interrupted.history().since_loss == 6

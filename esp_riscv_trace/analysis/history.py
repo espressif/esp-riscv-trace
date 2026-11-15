@@ -172,6 +172,8 @@ class History:
     # the trace: it starts, loses trace or switches tasks below them.
     stack: tuple[StackFrame, ...] = ()
     loop: CodeLoop | None = None
+    # Of ``instructions``, those since the trace started or last lost trace. Code outside the traced range loses none.
+    since_loss: int = 0
 
     def entries(self) -> Iterator[HistoryEntry]:
         """Yield every entry in order, with the last pass of each loop."""
@@ -311,6 +313,7 @@ class HistoryBuilder:
                 for f in reversed(self._stack)
             ),
             loop=None if loop is None else CodeLoop(loop.start, loop.end, loop.instructions, loop.passes, loop.whole),
+            since_loss=self._since_loss,
         )
 
     # ------------------------------------------------------------------

@@ -19,6 +19,9 @@ printed. `capture.image` reads code bytes and names functions. `capture.data_at(
 application ELF at an address, as `name` or `name+offset`, from its sized data symbols. It returns `None` without an
 ELF.
 
+`history.instructions` counts the instructions up to the fault, and `history.since_loss` those since the trace
+started or last lost trace. Code outside the traced range loses no trace, so it does not reset the count.
+
 `HistoryBuilder` builds the same history one event at a time, for a caller that passes the events to other code in
 the same pass. Push events until `done` is `True`, then call `close()`. A trap handler that calls the FreeRTOS
 scheduler, the function the image names `vTaskSwitchContext`, can resume another task. `StackFrame.unsure` marks
