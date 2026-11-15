@@ -14,6 +14,7 @@ __version__ = "0.2.0"
 from .analysis.history import (
     CodeLoop,
     History,
+    HistoryBuilder,
     HistoryEntry,
     HistoryItem,
     HistoryKind,
@@ -27,7 +28,7 @@ from .analysis.location import CodeLocation
 from .api import TraceCapture, TraceCore, open_capture
 from .decoder.reconstruct import GapReason
 from .exporters.note import format_note
-from .ir.capture_note import ElfShaStatus, TraceCaptureNote
+from .ir.capture_note import ElfShaStatus, TraceCaptureNote, compare_elf_sha
 from .ir.events import (
     InsnClass,
     LinkKind,
@@ -65,6 +66,7 @@ __all__ = [
     "ElfShaStatus",
     "GapReason",
     "History",
+    "HistoryBuilder",
     "HistoryEntry",
     "HistoryItem",
     "HistoryKind",
@@ -91,6 +93,7 @@ __all__ = [
     "__version__",
     "build_history",
     "cause_name",
+    "compare_elf_sha",
     "format_note",
     "is_fault",
     "open_capture",

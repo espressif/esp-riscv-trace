@@ -14,6 +14,7 @@ from .capture_note import (
     ElfShaStatus,
     InferredWrapState,
     TraceCaptureNote,
+    compare_elf_sha,
 )
 from .events import (
     InsnClass,
@@ -42,4 +43,5 @@ __all__ = [
     "TraceSync",
     "TraceTrap",
     "TraceWarning",
+    "compare_elf_sha",
 ]

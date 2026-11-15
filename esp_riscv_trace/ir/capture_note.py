@@ -26,6 +26,21 @@ class ElfShaStatus(StrEnum):
     NO_ELF = "no_elf"
 
 
+def compare_elf_sha(recorded: bytes, size: int, elf_sha256: bytes | None) -> ElfShaStatus:
+    """Compare the hash a capture recorded with the SHA-256 of the application ELF.
+
+    ``recorded`` and ``size`` are the hash and its declared length, as ``NoteHeader.app_elf_sha256`` and
+    ``app_elf_sha256_size`` give them. Only the first ``size`` bytes are compared, so a capture that records part of
+    the digest matches the ELF it was built from. ``elf_sha256`` is ``None`` without an ELF.
+    """
+    if elf_sha256 is None:
+        return ElfShaStatus.NO_ELF
+    prefix = recorded[: max(size, 0)]
+    if not prefix:
+        return ElfShaStatus.NO_SNAPSHOT_HASH
+    return ElfShaStatus.MATCH if prefix == elf_sha256[: len(prefix)] else ElfShaStatus.MISMATCH
+
+
 @dataclass(frozen=True)
 class TraceCaptureNote:
     """One core's decoder header."""
@@ -66,4 +81,5 @@ __all__ = [
     "ElfShaStatus",
     "InferredWrapState",
     "TraceCaptureNote",
+    "compare_elf_sha",
 ]

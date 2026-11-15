@@ -32,7 +32,7 @@ from .ir import (
     TraceCaptureNote,
     TraceEvent,
 )
-from .ir.capture_note import ElfShaStatus, InferredWrapState
+from .ir.capture_note import ElfShaStatus, InferredWrapState, compare_elf_sha
 from .snapshot import abi
 from .snapshot.chip import chip_name_from_id, is_riscv_trace_chip
 
@@ -242,17 +242,12 @@ def build_capture_note(
     snapshot_sha = capture.app_elf_sha256
     elf_sha: bytes | None = None
     elf_path: str | None = None
-    if session.elf is None:
-        status = ElfShaStatus.NO_ELF
-    else:
+    if session.elf is not None:
         elf_sha = session.elf.sha256()
         elf_path = str(session.elf.path)
-        if snapshot_sha is None:
-            status = ElfShaStatus.NO_SNAPSHOT_HASH
-        elif elf_sha == snapshot_sha:
-            status = ElfShaStatus.MATCH
-        else:
-            status = ElfShaStatus.MISMATCH
+    # The containers keep only a full digest, so this compares all of it
+    recorded = snapshot_sha or b""
+    status = compare_elf_sha(recorded, len(recorded), elf_sha)
     wrap_state, wrap_reason = _wrap_state_view(core.wrap_state, linear)
     return TraceCaptureNote(
         source=str(capture.source_path),
