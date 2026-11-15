@@ -5,8 +5,11 @@ with the `expected_*` files. For `decode` only the header, marker and summary li
 instruction listing is several MB per capture. A SHA-256 of the instruction lines pins them. `decode --last`,
 `history`, `stats` and `profile` outputs are compared in full.
 
-`test_instruction_objdump.py` compares the instruction decoder with `riscv32-esp-elf-objdump` over every app ELF. It
-finds objdump on `PATH` or in the ESP-IDF tools directory and is skipped without it.
+`test_instruction_objdump.py` compares both instruction decoders with `riscv32-esp-elf-objdump` over every app ELF:
+the control-flow class, link and target of every instruction, and the register effects and text of each distinct
+instruction word. It finds objdump on `PATH` or in the ESP-IDF tools directory and is skipped without it.
+`test_semantics.py` covers what the ELFs lack, such as the ordering bits of the AMOs, and checks that the two decoders
+agree on control flow for every compressed encoding.
 
 ## Test Data
 
@@ -22,6 +25,11 @@ per target serves all three captures:
 | `built_apps/<target>.elf` | the app ELF of all three captures |
 
 Every capture stores the SHA-256 of its app ELF. Replace the captures and the ELF together.
+
+`built_apps/esp32p4.elf` is the same app built for ESP32-P4 and has no captures. It adds the instructions of another
+trace-capable chip to the objdump comparison. Build it as below with `set-target esp32p4 build`, without `flash`. Its
+SHA-256 starts with `d34c6aea`. If an app ELF is replaced, update `MIN_DISTINCT_WORDS` in
+`test_instruction_objdump.py` from the counts its comment describes.
 
 ## Update the Captures
 

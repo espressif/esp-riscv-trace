@@ -1,20 +1,59 @@
 # SPDX-FileCopyrightText: 2026 Espressif Systems (Shanghai) CO LTD
 # SPDX-License-Identifier: Apache-2.0
-"""RV32 encoding rules of the control-flow decoder."""
+"""RV32 encoding rules that the control-flow and semantics decoders share."""
 
 from __future__ import annotations
 
+# Registers are 32 bits wide
+MASK32 = 0xFFFFFFFF
+
+# Bytes of a register and of a stack slot
+XLEN_BYTES = 4
+
 RA = 1
+SP = 2
 T0 = 5
+A0 = 10
+A1 = 11
+# s0 to s11
+S_REGS = (8, 9, *range(18, 28))
 
 # Bits 1..0 of the first parcel, which are 0b11 for a 32-bit instruction
 QUADRANT_MASK = 0x3
 QUADRANT_32BIT = 0x3
 OPCODE_MASK = 0x7F
+OPCODE_LOAD = 0x03
+OPCODE_LOAD_FP = 0x07
+OPCODE_MISC_MEM = 0x0F
+OPCODE_OP_IMM = 0x13
+OPCODE_AUIPC = 0x17
+OPCODE_STORE = 0x23
+OPCODE_STORE_FP = 0x27
+OPCODE_AMO = 0x2F
+OPCODE_OP = 0x33
+OPCODE_LUI = 0x37
+OPCODE_MADD = 0x43
+OPCODE_MSUB = 0x47
+OPCODE_NMSUB = 0x4B
+OPCODE_NMADD = 0x4F
+OPCODE_OP_FP = 0x53
 OPCODE_BRANCH = 0x63
 OPCODE_JALR = 0x67
 OPCODE_JAL = 0x6F
 OPCODE_SYSTEM = 0x73
+
+# ABI names by register number
+REG_NAMES = (
+    "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
+    "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
+    "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
+    "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+)  # fmt: skip
+
+
+def reg_name(reg: int) -> str:
+    """Return the ABI name of register ``x<reg>``."""
+    return REG_NAMES[reg]
 
 
 class InsnError(ValueError):
@@ -110,15 +149,37 @@ def zcm_mnemonic(insn: int) -> str | None:
 
 
 __all__ = [
+    "A0",
+    "A1",
+    "MASK32",
+    "OPCODE_AMO",
+    "OPCODE_AUIPC",
     "OPCODE_BRANCH",
     "OPCODE_JAL",
     "OPCODE_JALR",
+    "OPCODE_LOAD",
+    "OPCODE_LOAD_FP",
+    "OPCODE_LUI",
+    "OPCODE_MADD",
     "OPCODE_MASK",
+    "OPCODE_MISC_MEM",
+    "OPCODE_MSUB",
+    "OPCODE_NMADD",
+    "OPCODE_NMSUB",
+    "OPCODE_OP",
+    "OPCODE_OP_FP",
+    "OPCODE_OP_IMM",
+    "OPCODE_STORE",
+    "OPCODE_STORE_FP",
     "OPCODE_SYSTEM",
     "QUADRANT_32BIT",
     "QUADRANT_MASK",
     "RA",
+    "REG_NAMES",
+    "SP",
+    "S_REGS",
     "T0",
+    "XLEN_BYTES",
     "ZCMP_RLIST_MIN",
     "ZCMT_JALT_MIN",
     "InsnError",
@@ -127,6 +188,7 @@ __all__ = [
     "cj_imm",
     "j_imm",
     "length",
+    "reg_name",
     "sign_extend",
     "zcm_mnemonic",
 ]
