@@ -58,7 +58,7 @@ _LOOP_LOOKBACK = 4096
 
 # The FreeRTOS function that picks the next task. A trap handler that calls it can resume another task, which
 # tasks that yield through the same code do at the very instruction the trap interrupted.
-SCHEDULER_FUNCTIONS = frozenset({"vTaskSwitchContext"})
+_SCHEDULER_FUNCTIONS = frozenset({"vTaskSwitchContext"})
 
 _SCHEDULER_SWITCH = "the trap handler ran the scheduler and resumed another task at the interrupted instruction"
 
@@ -172,6 +172,8 @@ class History:
     # the trace: it starts, loses trace or switches tasks below them.
     stack: tuple[StackFrame, ...] = ()
     loop: CodeLoop | None = None
+    # Of ``instructions``, those since the trace started or last lost trace. Code outside the traced range loses none.
+    since_loss: int = 0
 
     def entries(self) -> Iterator[HistoryEntry]:
         """Yield every entry in order, with the last pass of each loop."""
@@ -311,6 +313,7 @@ class HistoryBuilder:
                 for f in reversed(self._stack)
             ),
             loop=None if loop is None else CodeLoop(loop.start, loop.end, loop.instructions, loop.passes, loop.whole),
+            since_loss=self._since_loss,
         )
 
     # ------------------------------------------------------------------
@@ -562,7 +565,7 @@ class HistoryBuilder:
         self._recent.append(None)
 
     def _runs_scheduler(self, target: int | None) -> bool:
-        return self._image is not None and target is not None and self._symbol(target) in SCHEDULER_FUNCTIONS
+        return self._image is not None and target is not None and self._symbol(target) in _SCHEDULER_FUNCTIONS
 
     def _leaves_function(self, insn: TraceInstruction) -> bool:
         if insn.next_pc is None:
@@ -705,7 +708,6 @@ def _rebase(items: Sequence[HistoryItem]) -> tuple[HistoryItem, ...]:
 __all__ = [
     "EXCEPTION_NAMES",
     "MAX_LOOP_PERIOD",
-    "SCHEDULER_FUNCTIONS",
     "CodeLoop",
     "History",
     "HistoryBuilder",

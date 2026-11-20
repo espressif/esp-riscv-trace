@@ -78,6 +78,14 @@ class TraceCapture:
         """Return the function and source line of ``pc``."""
         return locate(pc, self.image, self._session.resolver)
 
+    def data_at(self, address: int) -> str | None:
+        """Return the variable of the application ELF at ``address``, as ``name`` or ``name+offset``.
+
+        ``None`` without ``elf``, or when no sized data symbol covers the address.
+        """
+        elf = self._session.elf
+        return elf.data_at(address) if elf is not None else None
+
 
 @contextlib.contextmanager
 def open_capture(

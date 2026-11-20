@@ -204,6 +204,30 @@ def test_history_names_the_variable_code_ran_in(tmp_path) -> None:
         )
 
 
+def test_data_symbols_cover_their_size_only(tmp_path) -> None:
+    elf = _write_elf(
+        tmp_path / "app.elf",
+        [
+            ("s_buf", _CODE + 0x40, 0x10, _STT_OBJECT, _TEXT),
+            ("s_next", _CODE + 0x50, 4, _STT_OBJECT, _TEXT),
+            ("s_unsized", _CODE + 0x60, 0, _STT_OBJECT, _TEXT),
+            # a linker script assignment keeps the size of the definition it replaces
+            ("s_abs", _CODE + 0x70, 8, _STT_OBJECT, _SHN_ABS),
+        ],
+    )
+    with ElfImage(elf) as image:
+        assert [image.data_at(_CODE + n) for n in (0x3F, 0x40, 0x44, 0x4F, 0x50, 0x54, 0x60, 0x70)] == [
+            None,
+            "s_buf",
+            "s_buf+4",
+            "s_buf+15",
+            "s_next",
+            None,
+            None,
+            None,
+        ]
+
+
 @pytest.mark.parametrize(
     "env",
     [{"IDF_PATH": "", "ESP_ROM_ELF_DIR": "/x"}, {"IDF_PATH": "/x", "ESP_ROM_ELF_DIR": ""}],
