@@ -25,7 +25,7 @@ from esp_riscv_trace.containers.base import TraceBuffer
 from esp_riscv_trace.decoder.framing import Frame
 from esp_riscv_trace.decoder.packets import SyncPacket
 from esp_riscv_trace.decoder.reconstruct import GapReason
-from esp_riscv_trace.elf import CodeReadError
+from esp_riscv_trace.elf import CodeImage, CodeReadError
 from esp_riscv_trace.elf.dwarf import SourceLocation
 from esp_riscv_trace.ir.capture_note import ElfShaStatus, TraceCaptureNote
 from esp_riscv_trace.ir.events import InsnClass, LinkKind, TraceEvent, TraceGap, TraceInstruction, TraceSync, TraceTrap
@@ -167,7 +167,7 @@ class Trace:
         return self
 
     def history(
-        self, *, last: int = 0, image: RangeImage | None = IMAGE, end_interrupts: tuple[int, ...] = ()
+        self, *, last: int = 0, image: CodeImage | None = IMAGE, end_interrupts: tuple[int, ...] = ()
     ) -> History:
         return build_history(self.events, image, last=last, end_interrupts=end_interrupts)
 

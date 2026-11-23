@@ -22,6 +22,13 @@ ELF.
 `history.instructions` counts the instructions up to the fault, and `history.since_loss` those since the trace
 started or last lost trace. Code outside the traced range loses no trace, so it does not reset the count.
 
+The trace does not report where a call into code outside the traced range goes. `HistoryEntry.target` of that call
+is `None`, unless the instruction that retired right before the call is an `auipc` or `lui` at the address before it
+that sets the base register of its `jalr`. The target is then computed from the two instructions, with bit 0 cleared
+as `jalr` does, and `HistoryEntry.target_inferred` is `True`. A call the trace reached by a jump, or right after a
+sync, a trap or a gap, keeps `None`, as does code the image cannot read or decode. `TraceInstruction.next_pc`
+stays as the trace reported it.
+
 `HistoryBuilder` builds the same history one event at a time, for a caller that passes the events to other code in
 the same pass. Push events until `done` is `True`, then call `close()`. A trap handler that calls the FreeRTOS
 scheduler, the function the image names `vTaskSwitchContext`, can resume another task. `StackFrame.unsure` marks

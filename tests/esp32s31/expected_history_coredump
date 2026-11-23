@@ -39,11 +39,11 @@
 0x4000c34a       13    } getc                                                                  /IDF_PROJECT/main/test_app_main.c:60
 0x4000c4fc       27  } read_command                                                            /IDF_PROJECT/main/test_app_main.c:101
 0x4000c44a       12  abort() {                                                                 /IDF_PROJECT/main/test_app_main.c:102
-0x2f0068e8        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:25
-0x2f0068fa        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:27
-0x2f00690c        0    <untraced>()                                                            /IDF/components/esp_libc/src/abort.c:28
+0x2f0068e8        0    memset() (untraced)                                                     /IDF/components/esp_libc/src/abort.c:25
+0x2f0068fa        0    itoa() (untraced)                                                       /IDF/components/esp_libc/src/abort.c:27
+0x2f00690c        0    itoa() (untraced)                                                       /IDF/components/esp_libc/src/abort.c:28
                  36    loop x4 {
-0x2f006944        0      <untraced>()                                                          /IDF/components/esp_libc/src/abort.c:35
+0x2f006944        0      strcat() (untraced)                                                   /IDF/components/esp_libc/src/abort.c:35
                        }
 0x2f006932        2    esp_system_abort() {                                                    /IDF/components/esp_libc/src/abort.c:38
 0x2f00719a        5      panic_abort() {                                                       /IDF/components/esp_system/port/esp_system_chip.c:88
