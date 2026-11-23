@@ -19,7 +19,7 @@ from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from ..decoder.encoding import MASK32
+from ..decoder.encoding import ECALL_LENGTH, MASK32
 from ..decoder.reconstruct import GapReason
 from ..decoder.semantics import decode_at
 from ..elf import CodeImage
@@ -46,9 +46,6 @@ EXCEPTION_NAMES: dict[int, str] = {
 # Environment calls are requests the handler serves and returns from, not faults
 _ECALL_CAUSES = frozenset({8, 9, 11})
 
-# ecall has no compressed form
-_ECALL_LENGTH = 4
-
 # Longest run of items that folds into a loop
 MAX_LOOP_PERIOD = 16
 
@@ -68,6 +65,11 @@ _SCHEDULER_SWITCH = "the trap handler ran the scheduler and resumed another task
 def is_fault(trap: TraceTrap) -> bool:
     """Tell whether ``trap`` is an exception other than an environment call, where a crash analysis ends."""
     return not trap.interrupt and trap.cause not in _ECALL_CAUSES
+
+
+def ends_history(trap: TraceTrap, end_interrupts: Collection[int]) -> bool:
+    """Tell whether ``trap`` is a fault or an interrupt whose mcause exception code is in ``end_interrupts``."""
+    return is_fault(trap) or (trap.interrupt and trap.cause in end_interrupts)
 
 
 def cause_name(cause: int, interrupt: bool) -> str:
@@ -456,11 +458,16 @@ class HistoryBuilder:
             self._new_segment()
             self._running = True
         epc = trap.epc
-        ends = trap.interrupt and trap.cause in self._end_interrupts
-        if ends or is_fault(trap):
+        if ends_history(trap, self._end_interrupts):
             tval = None if trap.interrupt else trap.tval
             self._open(
-                HistoryKind.FAULT, epc, trap.handler_pc, self._depth, cause=trap.cause, tval=tval, interrupt=ends
+                HistoryKind.FAULT,
+                epc,
+                trap.handler_pc,
+                self._depth,
+                cause=trap.cause,
+                tval=tval,
+                interrupt=trap.interrupt,
             )
             self._fault = self._pending
             self._finish_pending()
@@ -472,7 +479,7 @@ class HistoryBuilder:
         else:
             # The handler returns past the ecall, or retries it
             kind, tval = HistoryKind.ECALL, trap.tval
-            resume = () if epc is None else (epc + _ECALL_LENGTH, epc)
+            resume = () if epc is None else (epc + ECALL_LENGTH, epc)
         self._open(kind, epc, trap.handler_pc, self._depth, cause=trap.cause, tval=tval)
         self._push_frame(_Frame(self._depth, resume, trap=True, pc=epc, kind=kind, cause=trap.cause))
         self._depth += 1

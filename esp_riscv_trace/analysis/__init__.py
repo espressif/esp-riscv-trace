@@ -24,6 +24,7 @@ from .history import (
     iter_entries,
 )
 from .location import CodeLocation, locate
+from .origin import FaultWindow, FaultWindowBuilder
 from .stats import (
     UNRESOLVED_FILE,
     UNRESOLVED_LINE,
@@ -39,6 +40,8 @@ __all__ = [
     "CodeLocation",
     "CodeLoop",
     "DiagnosticAccumulator",
+    "FaultWindow",
+    "FaultWindowBuilder",
     "History",
     "HistoryBuilder",
     "HistoryEntry",
