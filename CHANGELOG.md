@@ -1,3 +1,18 @@
+## v0.3.0 (2026-11-23)
+
+### ✨ New Features
+
+- **analysis**: Add the fault window for the register origin walks *(Erhan Kurubas - 15e2b34)*
+- **history**: Name the callee of a call into untraced code *(Erhan Kurubas - f56f0fd)*
+- **decoder**: Add the instruction semantics decoder *(Erhan Kurubas - bf35e03)*
+- **history**: Count the instructions since the last lost trace *(Erhan Kurubas - 7ba225b)*
+- **api**: Expose data symbols, the ELF hash check and HistoryBuilder *(Erhan Kurubas - be69c1c)*
+
+### 🔧 Code Refactoring
+
+- **decoder**: Move the shared RV32 encoding rules to encoding.py *(Erhan Kurubas - a0db23e)*
+
+
 ## v0.2.0 (2026-11-11)
 
 ### ✨ New Features
